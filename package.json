@@ -2,17 +2,19 @@
   "name": "require-packages",
   "version": "0.0.0",
   "description": "Patch \"require\" function to apply special rules of modules availability for each other",
+  "main": "src/require-package.js",
   "scripts": {
-    "test": "node_modules/karma/bin/karma start --singleRun"
+    "test": "node_modules/karma/bin/karma start --singleRun",
+    "build": "node_modules/uglify-js/bin/uglifyjs -o dist/src/require-package.min.js src/require-package.js"
   },
   "author": "Jeron Diovis",
   "license": "MIT",
-   "keywords": [
-     "require",
-     "commonjs",
-     "module",
-     "package"
-   ],
+  "keywords": [
+    "require",
+    "commonjs",
+    "module",
+    "package"
+  ],
   "devDependencies": {
     "chai": "^1.9.1",
     "karma-chai": "^0.1.0",
@@ -22,6 +24,7 @@
     "karma-phantomjs-launcher": "^0.1.4",
     "karma": "^0.12.16",
     "coffee-script": "^1.7.1",
-    "karma-coffee-preprocessor": "^0.2.1"
+    "karma-coffee-preprocessor": "^0.2.1",
+    "uglify-js": "^2.4.13"
   }
 }
