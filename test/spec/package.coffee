@@ -19,7 +19,12 @@ describe "requiring packages", ->
 
     {
       location: /^packages\/\w+$/
-      packages: /^nested_\w+$/
+      packages: [
+        {
+          location: /^nested_\w+$/
+          packages: /^depths_\w+$/
+        }
+      ]
     }
 
     {
@@ -126,10 +131,15 @@ describe "requiring packages", ->
         catch e
           error = e
 
-      define "packages/test/nested_pkg/main", -> "child main"
+      define "packages/test/nested_pkg/main", ->
+        #"child main"
+        require "packages/test/nested_pkg/depths_deep"
       define "packages/test/nested_pkg/internal", -> "Still secret!"
 
+      define "packages/test/nested_pkg/depths_deep/main", -> "we need to go deeper"
+
       require "packages/test"
-      expect(childMain).is.equal "child main"
+      #expect(childMain).is.equal "child main"
+      expect(childMain).is.equal "we need to go deeper"
       expect(childPrivate).is.null
       expect(error).is.an.instanceOf Error

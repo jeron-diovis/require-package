@@ -212,14 +212,12 @@
         for (var pkgPath in packages) {
             var pkg = packages[pkgPath];
             if (isPathInPackage(modulePath, pkg)) {
-                var nestedPkg;
-                //console.log('pkg found:', modulePath, pkg.location, pkg.packages);
-                if (pkg.packages && (nestedPkg = parseMultipathPackages(modulePath, pkg.packages, pkg.location))) {
-                //    console.log('IsNested', modulePath, nestedPkg);
-                    return nestedPkg;
-                } else {
-                    return pkg;
+                var parentPkg;
+                while (pkg && pkg.packages) {
+                    parentPkg = pkg;
+                    pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
                 }
+                return pkg || parentPkg;
             }
         }
 
@@ -253,6 +251,7 @@
 
         var parts = (!parentPath ? modulePath : modulePath.slice(parentPath.length)).split('/');
 
+        //console.log("parse " + modulePath + ' inside ' + parentPath);
         for (var i = 0; i < parts.length; i++) {
             if (i > 0) { testPath += '/'; }
             testPath += parts[i];
@@ -278,8 +277,12 @@
         if (modulePkg === false) {
             result = isMatches(modulePath, pkg.external);
         } else {
+            /*console.log(modulePath, pkg.location, modulePkg.location);
+            console.log('pkgs equal:', modulePkg === pkg);
+            console.log('isParent:', isParent(pkg, modulePkg));
+            console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));*/
             result = (modulePkg === pkg)
-                    || (isParent(pkg, modulePkg) && isPathLeadsToMainFileOfPackage(modulePath, modulePkg) )
+                    || (isParent(pkg, modulePkg) && isPathLeadsToMainFileOfPackage(modulePath, modulePkg))
         }
 
         return result;
