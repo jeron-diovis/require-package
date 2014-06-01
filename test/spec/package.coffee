@@ -30,6 +30,12 @@ describe "requiring packages", ->
     {
       location: "packages/public_pkg"
       public: /^pub_/
+      packages: [
+        {
+          location: /^nested_\w+$/
+          public: /^pub_/
+        }
+      ]
     }
 
     (modulePath) -> modulePath is "functional_package"
@@ -71,11 +77,21 @@ describe "requiring packages", ->
         expect(-> require "packages/test/main/internal").to.throw /denied/, "Private file is available from outside"
         expect(-> require "packages/friend").to.throw /denied/, "Private file is available from another package"
 
-      it "should be allowed for explicitly listed files", ->
-        define "packages/public_pkg/internal", -> "Secret!"
-        define "packages/public_pkg/pub_internal", -> "Available"
-        expect(-> require "packages/public_pkg/internal").to.throw /denied/, "Private file is available"
-        expect(require "packages/public_pkg/pub_internal").is.equal "Available", "Public file is not available"
+      describe "for explicitly listed files", ->
+        it "should be allowed only in parent's scope", ->
+          define "packages/public_pkg/main", -> require "packages/public_pkg/nested_pkg/pub_internal"
+
+          define "packages/public_pkg/internal", -> "Secret!"
+          define "packages/public_pkg/pub_internal", -> "Available"
+
+          define "packages/public_pkg/nested_pkg/internal", -> "Nested Secret!"
+          define "packages/public_pkg/nested_pkg/pub_internal", -> "Nested Available"
+
+          expect(-> require "packages/public_pkg/internal").to.throw /denied/, "Private file is available"
+          expect(require "packages/public_pkg/pub_internal").is.equal "Available", "Public file is not available"
+
+          expect(require "packages/public_pkg").is.equal "Nested Available", "Child's public files are not available to parent"
+          expect(-> require "packages/public_pkg/nested_pkg/pub_internal").to.throw /denied/, "Child's private files are available from external module"
 
     describe "from inside package", ->
       it "should be allowed", ->
@@ -117,29 +133,28 @@ describe "requiring packages", ->
       expect(-> require "packages/failed_external_package").to.throw /denied/, "Wow, it works"
 
 
-  describe "nested packages", ->
-    it "should allow for parents to access main file of children", ->
-      # some workaround to test function execution results without sinon
-      error = null
-      childMain = null
-      childPrivate = null
+  describe "nested packages access", ->
+    describe "from parent to children", ->
+      it "should be allowed for children's main files", ->
+        # some workaround to test function execution results without sinon
+        error = null
+        childMain = null
+        childPrivate = null
 
-      define "packages/test/main", ->
-        childMain = require "packages/test/nested_pkg"
-        try
-          childPrivate = require "packages/test/nested_pkg/internal"
-        catch e
-          error = e
+        define "packages/test/main", ->
+          childMain = require "packages/test/nested_pkg"
+          try
+            childPrivate = require "packages/test/nested_pkg/internal"
+          catch e
+            error = e
 
-      define "packages/test/nested_pkg/main", ->
-        #"child main"
-        require "packages/test/nested_pkg/depths_deep"
-      define "packages/test/nested_pkg/internal", -> "Still secret!"
+        define "packages/test/nested_pkg/main", -> require "packages/test/nested_pkg/depths_deep"
+        define "packages/test/nested_pkg/internal", -> "Still secret!"
+        define "packages/test/nested_pkg/depths_deep/main", -> "we need to go deeper"
 
-      define "packages/test/nested_pkg/depths_deep/main", -> "we need to go deeper"
+        require "packages/test"
+        expect(childMain).is.equal "we need to go deeper"
+        expect(childPrivate).is.null
+        expect(error).is.an.instanceOf Error
 
-      require "packages/test"
-      #expect(childMain).is.equal "child main"
-      expect(childMain).is.equal "we need to go deeper"
-      expect(childPrivate).is.null
-      expect(error).is.an.instanceOf Error
+   # describe "from children to parent", ->
