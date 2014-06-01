@@ -1,6 +1,6 @@
 {
   "name": "require-packages",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Patch \"require\" function to apply special rules of modules availability for each other",
   "main": "src/require-package.js",
   "scripts": {

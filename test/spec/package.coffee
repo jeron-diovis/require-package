@@ -105,3 +105,4 @@ describe "requiring packages", ->
       define "utils", -> "utils"
       define "packages/failed_external_package/main", -> require "utils"
       expect(-> require "packages/failed_external_package").to.throw /denied/, "Wow, it works"
+

@@ -172,7 +172,9 @@
             result = modulePath.indexOf(pkg.location) === 0;
         }
 
-        cache[modulePath] = result ? pkg.location : false;
+        if (result) {
+            cache[modulePath] = pkg.location;
+        }
 
         return result;
     }
@@ -197,6 +199,7 @@
             }
         }
 
+        cache[modulePath] = false;
         return false;
     }
 
