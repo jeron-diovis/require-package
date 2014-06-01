@@ -4,7 +4,7 @@ module.exports = (config) ->
   config.set
 
   # base path that will be used to resolve all patterns (eg. files, exclude)
-    basePath: ""
+    basePath: "test"
 
   # frameworks to use
   # available frameworks: https://npmjs.org/browse/keyword/karma-adapter
@@ -12,10 +12,9 @@ module.exports = (config) ->
 
   # list of files / patterns to load in the browser
     files: [
-      #"node_modules/commonjs-require-definition/require.js"
-      "test/test-config.coffee"
-      "src/*.js"
-      "test/spec/**"
+      "test-build.js"
+      "test-config.coffee"
+      "spec/**"
     ]
 
   # list of files to exclude
@@ -47,7 +46,6 @@ module.exports = (config) ->
   # start these browsers
   # available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
     browsers: [
-      #"PhantomJS"
       "Chrome"
     ]
 
