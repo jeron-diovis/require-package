@@ -41,7 +41,7 @@
         ensurePathAccessible(modulePath, parentPath);
 
         var module, modulePkg = getPackageForPath(modulePath);
-        //console.log('REQ:', modulePath, parentPath, modulePkg.location);
+        console.log('REQ:', modulePath, parentPath, modulePkg.location);
 
         if (modulePkg !== false) {
             if (modulePath === modulePkg.location) {
@@ -108,7 +108,7 @@
 
     // -----------------
 
-    function initialize(pkgs) {
+    function initialize(pkgs, parentLocation) {
         var pkg, rawPkg;
 
         // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
@@ -130,16 +130,24 @@
             defaults(pkg, options.defaults);
 
             if (typeof pkg.location === 'string') {
-                pkg.location = pkg.location.replace(/\/$/, '');
+                parentLocation || (parentLocation = '');
+                pkg.location = parentLocation + rtrimSlash(pkg.location);
+                console.log('define exact pkg:', parentLocation, pkg.location);
                 // exact locations are always stored in global cache:
                 packages[pkg.location] = pkg;
+                cache[pkg.location] = pkg.location;
+                cache[pkg.location + '/' + pkg.main] = pkg.location;
+                if (parentLocation.length > 0) {
+                    parents[pkg.location] = rtrimSlash(parentLocation);
+                    parents[pkg.location + '/' + pkg.main] = rtrimSlash(parentLocation);
+                }
                 pkgs.splice(i, 1);
             } else {
                 pkgs[i] = pkg;
                 ++i;
             }
             if (pkg.packages) {
-                pkg.packages = initialize(pkg.packages);
+                pkg.packages = initialize(pkg.packages, typeof pkg.location === 'string' ? pkg.location + '/' : '');
             }
         }
 
@@ -196,7 +204,7 @@
 
     function isPathLeadsToMainFileOfPackage(modulePath, pkg) {
         return modulePath === pkg.location
-            || (isParent(pkg.location, modulePath) && modulePath.slice(-pkg.main.length) === pkg.main)
+            || (isParent(pkg, modulePath) && modulePath.slice(-pkg.main.length) === pkg.main)
     }
 
     function isPathPublicForPackage(modulePath, pkg) {
@@ -219,15 +227,15 @@
             result = isParent(pkg, modulePath);
         }
 
-        if (result) {
-            cache[modulePath] = pkg.location;
-        }
-
         return result;
     }
 
     // find _first_ module whose location given module path matches to
     function getPackageForPath(modulePath) {
+        if (modulePath in packages) {
+            return packages[modulePath];
+        }
+
         if (modulePath in cache) {
             return cache[modulePath] !== false ? packages[cache[modulePath]] : false;
         }
@@ -240,7 +248,9 @@
                     parentPkg = pkg;
                     pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
                 }
-                return pkg || parentPkg;
+                pkg = pkg || parentPkg;
+                cache[modulePath] = pkg.location;
+                return pkg;
             }
         }
 
@@ -283,9 +293,16 @@
                 newPkg = deepClone(rawPkg);
                 newPkg.location = parentPath + testPath;
                 packages[newPkg.location] = newPkg;
-                parents[newPkg.location] = parentPath.replace(/\/$/, '');
+                if (parentPath.length > 0) {
+                    parents[newPkg.location] = rtrimSlash(parentPath);
+                    parents[newPkg.location + '/' + newPkg.main] = rtrimSlash(parentPath);
+                }
                 // each time override cache, so in cache is always the most-specific path:
                 cache[modulePath] = newPkg.location;
+
+                cache[newPkg.location] = newPkg.location;
+                cache[newPkg.location + '/' + newPkg.main] = newPkg.location;
+
                 ++foundPackages;
             }
         }
@@ -301,11 +318,11 @@
         if (modulePkg === false) {
             result = isMatches(modulePath, pkg.external);
         } else {
-            //console.log(modulePath, pkg.location, modulePkg.location);
-            //console.log('pkgs equal:', modulePkg === pkg);
-            //console.log('isParent:', isParent(pkg, modulePkg));
-            //console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));
-            //console.log('Rel to pub:', modulePath.slice(modulePkg.location.length + 1), modulePkg.public);
+            console.log('check for from inside:', modulePath, pkg.location, modulePkg.location);
+            console.log('pkgs equal:', modulePkg === pkg);
+            console.log('isParent:', isParent(pkg, modulePkg));
+            console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));
+            console.log('Rel to pub:', modulePath.slice(modulePkg.location.length + 1), modulePkg.public);
             result = (modulePkg === pkg)
                     || (isParent(pkg, modulePkg, true)
                         && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
@@ -319,13 +336,20 @@
 
     function isPathAccessibleFromOutsidePackage(modulePath, pkg) {
         var modulePkg = getPackageForPath(modulePath);
-        if (modulePkg === pkg) {
-            return (modulePath === pkg.location)
-                || (modulePath === pkg.location + '/' + pkg.main)
-                || (!hasParents(pkg) && isPathPublicForPackage(modulePath, pkg))
+        //console.log('check for from outside:',  modulePath, modulePkg.location, pkg.location);
+        if (modulePkg !== pkg) {
+            return true;
         }
 
-        return true;
+        /*return (modulePath === pkg.location)
+            || (modulePath === pkg.location + '/' + pkg.main)
+            || (!hasParents(pkg) && isPathPublicForPackage(modulePath, pkg));*/
+
+        //console.log("has parents", hasParents(pkg));
+        return !hasParents(pkg)
+                && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
+                    || isPathPublicForPackage(modulePath, pkg));
+
     }
 
     // -----------------
@@ -348,6 +372,8 @@
     }
 
     function defaults(dest, src) { for (var key in src) if (src.hasOwnProperty(key) && !dest.hasOwnProperty(key)) { dest[key] = src[key]; } }
+
+    function rtrimSlash(str) { return str.replace(/\/$/, ''); }
 
     // -----------------
 
