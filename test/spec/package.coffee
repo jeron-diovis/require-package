@@ -16,7 +16,11 @@ describe "requiring packages", ->
 
   # impossible to define packages in each test separately, as plugin denies multiple initialization
   require.packages.init [
-    /^packages\/\w+$/
+
+    {
+      location: /^packages\/\w+$/
+      packages: /^nested_\w+$/
+    }
 
     {
       location: "packages/public_pkg"
@@ -39,6 +43,7 @@ describe "requiring packages", ->
       location: /^packages\/failed_external_package$/
       external: (modulePath) -> modulePath.indexOf("utils") is 0
     }
+
   ]
 
   it "should allow direct access to main file", ->
@@ -106,3 +111,9 @@ describe "requiring packages", ->
       define "packages/failed_external_package/main", -> require "utils"
       expect(-> require "packages/failed_external_package").to.throw /denied/, "Wow, it works"
 
+
+  describe "nested packages", ->
+    it "should works", ->
+      define "packages/test/main", -> require "packages/test/nested_pkg"
+      define "packages/test/nested_pkg/main", -> "internal"
+      expect(require "packages/test").is.equal "internal"

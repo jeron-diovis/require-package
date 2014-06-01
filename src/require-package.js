@@ -5,14 +5,24 @@
         rawPackages = []; // "multi-packages", where location is regexp or function
                           // it produces new value for "packages" hash on every new path match
 
+    var isInitialized = false;
+
     var options = {
         defaults: {
             "main": "main",
-            // Following two options can be: string|regexp|function|array of all of these things
+            // Following options can be: string|regexp|function|array of all of these things
             "public": false, // package's internal files, available from outside of package
-            "external": false // external files, allowed to be required from inside package
+            "external": false, // external files, allowed to be required from inside package
+            "packages": false // nested packages
         },
-        init: initialize
+        init: function(pkgs) {
+            if (isInitialized) {
+                throw new Error('Packages list already initialized');
+            }
+            isInitialized = true;
+            rawPackages = initialize(pkgs);
+            return true;
+        }
     };
 
     // -----------------
@@ -28,6 +38,7 @@
         ensurePathAccessible(modulePath, parentPath);
 
         var module, modulePkg = getPackageForPath(modulePath);
+        //console.log(modulePath, modulePkg);
 
         if (modulePkg !== false) {
             if (modulePath === modulePkg.location) {
@@ -94,24 +105,20 @@
 
     // -----------------
 
-    var isInitialized = false;
-
     function initialize(pkgs) {
-        if (isInitialized) { throw new Error('Packages list already initialized'); }
-        isInitialized = true;
-
         var pkg, rawPkg;
 
         // Maybe, it is worth to deeply clone incoming data, to encapsulate them safety.
         // But it will be verbose enough (as need to clone functions and regexps)
-        rawPackages = pkgs;
-        if (!rawPackages.constructor === Array) {
-            rawPackages = [rawPackages];
+        if (pkgs.constructor !== Array) {
+            pkgs = [pkgs];
+        } else {
+            pkgs = pkgs.slice();
         }
 
         var i = 0;
-        while (i < rawPackages.length) {
-            rawPkg = rawPackages[i];
+        while (i < pkgs.length) {
+            rawPkg = pkgs[i];
             if (typeof rawPkg === 'object' && rawPkg.constructor === Object) {
                 pkg = rawPkg;
             } else {
@@ -120,15 +127,20 @@
             defaults(pkg, options.defaults);
 
             if (typeof pkg.location === 'string') {
+                pkg.location = pkg.location.replace(/\/$/, '');
+                // exact locations are always stored in global cache:
                 packages[pkg.location] = pkg;
-                rawPackages.splice(i, 1);
+                pkgs.splice(i, 1);
             } else {
-                rawPackages[i] = pkg;
+                pkgs[i] = pkg;
                 ++i;
+            }
+            if (pkg.packages) {
+                pkg.packages = initialize(pkg.packages);
             }
         }
 
-        return true;
+        return pkgs;
     }
 
     // -----------------
@@ -188,36 +200,56 @@
         for (var pkgPath in packages) {
             var pkg = packages[pkgPath];
             if (isPathInPackage(modulePath, pkg)) {
-                return pkg;
+                var nestedPkg;
+                //console.log('pkg found:', modulePath, pkg.location, pkg.packages);
+                if (pkg.packages && (nestedPkg = parseMultipathPackages(modulePath, pkg.packages, pkg.location))) {
+                  //  console.log('IsNested', modulePath, nestedPkg);
+                    return nestedPkg;
+                } else {
+                    return pkg;
+                }
             }
         }
 
-        for (var i = 0; i < rawPackages.length; i++) {
-            var rawPkg = rawPackages[i];
-            if (parseModulePathForPackages(modulePath, rawPkg)) {
-                return getPackageForPath(modulePath);
-            }
+        if (pkg = parseMultipathPackages(modulePath, rawPackages)) {
+            return pkg;
         }
 
         cache[modulePath] = false;
         return false;
     }
 
-    // Match module maths against multi-paths package and stores all found matches as separate "single-path" packages.
-    // Checks all possible subpaths of source path, level-by-level from root,
-    function parseModulePathForPackages(modulePath, rawPkg) {
-        var parts = modulePath.split('/'),
-            testPath = "",
+    function parseMultipathPackages(modulePath, rawPkgs, parentPath) {
+        for (var i = 0; i < rawPkgs.length; i++) {
+            var rawPkg = rawPkgs[i];
+            if (parseMultipathPackage(modulePath, rawPkg, parentPath)) {
+                return getPackageForPath(modulePath);
+            }
+        }
+        return false;
+    }
+
+    // Match module path against multi-paths package and store all found matches as separate "single-path" packages.
+    // Checks all possible subpaths of source path, level-by-level from root
+    function parseMultipathPackage(modulePath, rawPkg, parentPath) {
+        var testPath = "",
             newPkg,
             foundPackages = 0;
+
+        parentPath || (parentPath = '');
+        if (parentPath.length > 0) { parentPath += '/' }
+
+        var parts = (!parentPath ? modulePath : modulePath.slice(parentPath.length)).split('/');
+
         for (var i = 0; i < parts.length; i++) {
             if (i > 0) { testPath += '/'; }
             testPath += parts[i];
 
             if (isMatches(testPath, rawPkg.location)) {
                 newPkg = deepClone(rawPkg);
-                newPkg.location = testPath;
-                packages[testPath] = newPkg;
+                newPkg.location = parentPath + testPath;
+                packages[newPkg.location] = newPkg;
+                // each time override cache, so in cache is always the most-specific path:
                 cache[modulePath] = newPkg.location;
                 ++foundPackages;
             }
@@ -244,7 +276,7 @@
         if (modulePkg === pkg) {
             return (modulePath === pkg.location)
                 || (modulePath === pkg.location + '/' + pkg.main)
-                || isMatches(modulePath.slice(pkg.location.length + 1), pkg.public);
+                || isMatches(modulePath.slice(pkg.location.length + 1), pkg.public); // +1 for slash
         }
 
         return true;
