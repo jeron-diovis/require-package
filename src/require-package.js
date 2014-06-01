@@ -38,7 +38,7 @@
         ensurePathAccessible(modulePath, parentPath);
 
         var module, modulePkg = getPackageForPath(modulePath);
-        //console.log(modulePath, modulePkg);
+     //   console.log(modulePath, modulePkg);
 
         if (modulePkg !== false) {
             if (modulePath === modulePkg.location) {
@@ -168,6 +168,18 @@
         }
     }
 
+    function isParent(parent, child) {
+        if (parent === child) { return false; }
+        if (typeof child !== 'string') { child = child.location; }
+        if (typeof parent !== 'string') { parent = parent.location; }
+        return child.indexOf(parent) === 0;
+    }
+
+    function isPathLeadsToMainFileOfPackage(modulePath, pkg) {
+        return modulePath === pkg.location
+            || (isParent(pkg.location, modulePath) && modulePath.slice(-pkg.main.length) === pkg.main)
+    }
+
     // -----------------
 
     // check whether given path is inside given package (or inside any package, if no particular package given)
@@ -181,7 +193,7 @@
             pkg = getPackageForPath(modulePath);
             result = pkg !== false;
         } else {
-            result = modulePath.indexOf(pkg.location) === 0;
+            result = isParent(pkg, modulePath);
         }
 
         if (result) {
@@ -203,7 +215,7 @@
                 var nestedPkg;
                 //console.log('pkg found:', modulePath, pkg.location, pkg.packages);
                 if (pkg.packages && (nestedPkg = parseMultipathPackages(modulePath, pkg.packages, pkg.location))) {
-                  //  console.log('IsNested', modulePath, nestedPkg);
+                //    console.log('IsNested', modulePath, nestedPkg);
                     return nestedPkg;
                 } else {
                     return pkg;
@@ -261,13 +273,16 @@
     function isPathAccessibleFromInsidePackage(modulePath, pkg) {
         var modulePkg = getPackageForPath(modulePath);
 
+        var result = false;
+
         if (modulePkg === false) {
-            return isMatches(modulePath, pkg.external);
-        } else if (modulePkg === pkg) {
-            return true;
+            result = isMatches(modulePath, pkg.external);
+        } else {
+            result = (modulePkg === pkg)
+                    || (isParent(pkg, modulePkg) && isPathLeadsToMainFileOfPackage(modulePath, modulePkg) )
         }
 
-        return false;
+        return result;
     }
 
     function isPathAccessibleFromOutsidePackage(modulePath, pkg) {

@@ -113,7 +113,23 @@ describe "requiring packages", ->
 
 
   describe "nested packages", ->
-    it "should works", ->
-      define "packages/test/main", -> require "packages/test/nested_pkg"
-      define "packages/test/nested_pkg/main", -> "internal"
-      expect(require "packages/test").is.equal "internal"
+    it "should allow for parents to access main file of children", ->
+      # some workaround to test function execution results without sinon
+      error = null
+      childMain = null
+      childPrivate = null
+
+      define "packages/test/main", ->
+        childMain = require "packages/test/nested_pkg"
+        try
+          childPrivate = require "packages/test/nested_pkg/internal"
+        catch e
+          error = e
+
+      define "packages/test/nested_pkg/main", -> "child main"
+      define "packages/test/nested_pkg/internal", -> "Still secret!"
+
+      require "packages/test"
+      expect(childMain).is.equal "child main"
+      expect(childPrivate).is.null
+      expect(error).is.an.instanceOf Error
