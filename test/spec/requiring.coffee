@@ -52,6 +52,8 @@ describe "requiring packages", ->
             public: /^pub_/
             packages:
               location: /^nested_\w+$/
+              #location: "nested_pkg"
+              # TODO: when location is a string, it works without "public" below
               public: /^pub_/
 
           define "public_pkg/main", -> require "public_pkg/nested_pkg/pub_internal"
@@ -78,18 +80,15 @@ describe "requiring packages", ->
 
   describe "access to external files from inside package", ->
     it "should be denied by default", ->
-      require.packages.init /^packages\/\w+$/
+      require.packages.init "test_pkg"
       define "external_module", ->
-      define "packages/test/main", -> require "external_module"
-      expect(-> require "packages/test/main").to.throw /denied/, "External file is available"
+      define "test_pkg/main", -> require "external_module"
+      expect(-> require "test_pkg").to.throw /denied/, "External file is available"
 
     it "should be allowed for explicitly listed files", ->
-      require.packages.init [
-        {
-          location: "packages/with_externals"
-          external: ["utils", "lib/support"]
-        }
-      ]
+      require.packages.init
+        location: "packages/with_externals"
+        external: ["utils", "lib/support"]
 
       define "utils", -> "utils"
       define "lib/support", -> "support"
@@ -105,7 +104,7 @@ describe "requiring packages", ->
     describe "from parent to children", ->
       it "should be allowed for children's main files", ->
         require.packages.init
-          location: /^packages\/\w+$/
+          location: "test_pkg"
           packages:
             location: /^nested_\w+$/
             packages: /^depths_\w+$/
@@ -115,18 +114,18 @@ describe "requiring packages", ->
         childMain = null
         childPrivate = null
 
-        define "packages/test/main", ->
-          childMain = require "packages/test/nested_pkg"
+        define "test_pkg/main", ->
+          childMain = require "test_pkg/nested_pkg"
           try
-            childPrivate = require "packages/test/nested_pkg/internal"
+            childPrivate = require "test_pkg/nested_pkg/internal"
           catch e
             error = e
 
-        define "packages/test/nested_pkg/main", -> require "packages/test/nested_pkg/depths_deep"
-        define "packages/test/nested_pkg/internal", -> "Still secret!"
-        define "packages/test/nested_pkg/depths_deep/main", -> "we need to go deeper"
+        define "test_pkg/nested_pkg/main", -> require "test_pkg/nested_pkg/depths_deep"
+        define "test_pkg/nested_pkg/internal", -> "Still secret!"
+        define "test_pkg/nested_pkg/depths_deep/main", -> "we need to go deeper"
 
-        require "packages/test"
+        require "test_pkg"
         expect(childMain).is.equal "we need to go deeper"
         expect(childPrivate).is.null
         expect(error).is.an.instanceOf Error

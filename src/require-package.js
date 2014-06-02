@@ -4,8 +4,7 @@
         packages = {}, // map package location to full package config
         rawPackages = [], // "multi-packages", where location is regexp or function
                           // it produces new value for "packages" hash on every new path match
-
-        parents = {};
+        parents = {}; // map module path to _direct_ parent package
 
     var isInitialized = false;
 
@@ -16,6 +15,7 @@
             "public": false, // package's internal files, available from outside of package
             "external": false, // external files, allowed to be required from inside package
             "packages": false, // nested packages
+            // TODO: implement this:
             "inheritable": false // package's internal files, available from inside nested packages
         },
         init: function(pkgs) {
@@ -23,7 +23,10 @@
                 throw new Error('Packages list already initialized');
             }
             isInitialized = true;
-            rawPackages = initialize(pkgs);
+
+            // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
+            // But it will be verbose enough (as need to clone functions and regexps)
+            rawPackages = parseRawPackages(pkgs);
             return true;
         }
     };
@@ -31,21 +34,20 @@
     // -----------------
 
     var oldRequire = global.require,
-        modulesStack = ['__root__'];
+        modulesStack = ['**root**'];
 
     // -----------------
-
 
     function require(modulePath) {
         var parentPath = modulesStack[modulesStack.length - 1];
         ensurePathAccessible(modulePath, parentPath);
 
         var module, modulePkg = getPackageForPath(modulePath);
-        console.log('REQ:', modulePath, parentPath, modulePkg.location);
+        //console.log('REQ:', modulePath, parentPath, modulePkg.location);
 
         if (modulePkg !== false) {
             if (modulePath === modulePkg.location) {
-                modulePath += '/' + modulePkg.main;
+                modulePath = getPkgMainPath(modulePkg);
             }
         }
 
@@ -53,6 +55,8 @@
         try {
             module = oldRequire(modulePath);
         } finally {
+            // always return stack to previous state,
+            // to avoid cumulative effects when chain of "require"s throws error somewhere in depths
             modulesStack.pop();
         }
         return module;
@@ -65,9 +69,10 @@
     }
     global.require = require;
 
-    // -----------------
 
-    // The heart. Restrictions of package-based modules system:
+    // -----------------
+    // "Business-logic". Restrictions of package-based modules system. The what is this plugin for:
+
     function ensurePathAccessible(modulePath, currentModulePath) {
         var currentPkg = getPackageForPath(currentModulePath);
         var modulePkg = getPackageForPath(modulePath);
@@ -75,11 +80,8 @@
 
         // we are outside of any package:
         if (currentPkg === false) {
-            // requiring something inside some package:
-            if (modulePkg !== false) {
-                if (!isPathAccessibleFromOutsidePackage(modulePath, modulePkg)) {
-                    error = 'Access to package internal files from outside of package';
-                }
+            if (!isPathAccessibleFromOutsidePackage(modulePath)) {
+                error = 'Access to package internal files from outside of package';
             }
         }
         // we are inside some package:
@@ -106,13 +108,47 @@
         return true;
     }
 
-    // -----------------
+    // whether we can require @modulePath, when we are inside @pkg:
+    function isPathAccessibleFromInsidePackage(modulePath, pkg) {
+        var modulePkg = getPackageForPath(modulePath);
 
-    function initialize(pkgs, parentLocation) {
+        if (modulePkg === false) {
+            // TODO: restrict 'external' to only non-packaged files
+            return isMatches(modulePath, pkg.external);
+        }
+
+        /*console.log('check for from inside:', modulePath, pkg.location, modulePkg.location);
+         console.log('pkgs equal:', modulePkg === pkg);
+         console.log('isParent:', isParent(pkg, modulePkg));
+         console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));
+         console.log('Rel to pub:', modulePath.slice(modulePkg.location.length + 1), modulePkg.public);*/
+        return (modulePkg === pkg)
+            || (isParent(pkg, modulePkg, true)
+                && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
+                    || isPathPublicForPackage(modulePath, modulePkg)));
+    }
+
+    // whether we can require @modulePath, when we are outside of ANY package:
+    function isPathAccessibleFromOutsidePackage(modulePath) {
+        var modulePkg = getPackageForPath(modulePath);
+
+        // it's also some external file - don't care about it:
+        if (modulePkg === false) { return true; }
+
+        //console.log("has parents", hasParents(pkg));
+        // it's file inside some package - so:
+        return !hasParents(modulePkg)                                 // it can be available only if it is not nested package
+            && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg) // and it is package itself (main file),
+                || isPathPublicForPackage(modulePath, modulePkg));    //     or one of it's explicitly exposed files
+    }
+
+
+    // -----------------
+    // The heart. Parsing, saving, mapping, caching packages:
+
+    function parseRawPackages(pkgs, parentLocation) {
         var pkg, rawPkg;
 
-        // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
-        // But it will be verbose enough (as need to clone functions and regexps)
         if (pkgs.constructor !== Array) {
             pkgs = [pkgs];
         } else {
@@ -130,33 +166,129 @@
             defaults(pkg, options.defaults);
 
             if (typeof pkg.location === 'string') {
-                parentLocation || (parentLocation = '');
-                pkg.location = parentLocation + rtrimSlash(pkg.location);
-                console.log('define exact pkg:', parentLocation, pkg.location);
-                // exact locations are always stored in global cache:
-                packages[pkg.location] = pkg;
-                cache[pkg.location] = pkg.location;
-                cache[pkg.location + '/' + pkg.main] = pkg.location;
-                if (parentLocation.length > 0) {
-                    parents[pkg.location] = rtrimSlash(parentLocation);
-                    parents[pkg.location + '/' + pkg.main] = rtrimSlash(parentLocation);
-                }
-                pkgs.splice(i, 1);
+                savePackage(pkg, parentLocation);
+                pkgs.splice(i, 1); // remove saved from raw set
             } else {
                 pkgs[i] = pkg;
                 ++i;
             }
             if (pkg.packages) {
-                pkg.packages = initialize(pkg.packages, typeof pkg.location === 'string' ? pkg.location + '/' : '');
+                pkg.packages = parseRawPackages(pkg.packages, pkg.location);
+                if (pkg.packages.length === 0) {
+                    pkg.packages = false;
+                }
             }
         }
 
         return pkgs;
     }
 
+    function savePackage(pkg, parent) {
+        var parentLocation = trimSlash(ensureLocation(parent));
+
+        pkg.location = joinPath(parentLocation, pkg.location);
+
+        var mainFilePath = getPkgMainPath(pkg);
+
+        packages[pkg.location] = pkg;
+
+        cache[pkg.location] = pkg.location;
+        cache[mainFilePath] = pkg.location;
+
+        if (parentLocation.length > 0) {
+            parents[pkg.location] = parentLocation;
+            parents[mainFilePath] = parentLocation;
+        }
+        return pkg;
+    }
+
+    // check whether given path is inside given package (or inside any package, if no particular package given)
+    function isPathInPackage(modulePath, pkg) {
+        if (modulePath in cache) {
+            return cache[modulePath] !== false;
+        }
+
+        var result;
+        if (!pkg) {
+            pkg = getPackageForPath(modulePath);
+            result = pkg !== false;
+        } else {
+            result = isParent(pkg, modulePath);
+        }
+
+        return result;
+    }
+
+    // find module whose location given module path matches to
+    function getPackageForPath(modulePath) {
+        if (modulePath in packages) {
+            return packages[modulePath];
+        }
+
+        if (modulePath in cache) {
+            return cache[modulePath] !== false ? packages[cache[modulePath]] : false;
+        }
+
+        for (var pkgPath in packages) {
+            var pkg = packages[pkgPath];
+            if (isPathInPackage(modulePath, pkg)) {
+                var parentPkg;
+                while (pkg && pkg.packages) {
+                    parentPkg = pkg;
+                    pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
+                }
+                pkg = pkg || parentPkg;
+                cache[modulePath] = pkg.location;
+                return pkg;
+            }
+        }
+
+        if (pkg = parseMultipathPackages(modulePath, rawPackages)) {
+            return pkg;
+        }
+
+        cache[modulePath] = false;
+        return false;
+    }
+
+    function parseMultipathPackages(modulePath, rawPkgs, parentPath) {
+        for (var i = 0; i < rawPkgs.length; i++) {
+            var rawPkg = rawPkgs[i];
+            if (parseMultipathPackage(modulePath, rawPkg, parentPath)) {
+                return getPackageForPath(modulePath);
+            }
+        }
+        return false;
+    }
+
+    // Match module path against multi-paths package and store all found matches as separate "single-path" packages.
+    // Checks all possible subpaths of source path, level-by-level from root
+    function parseMultipathPackage(modulePath, rawPkg, parentPath) {
+        var testPath = '', newPkg, foundPackages = 0;
+
+        //console.log("parse " + modulePath + ' inside ' + parentPath);
+        var parts = trimPkgPath(modulePath, parentPath).split('/');
+        for (var i = 0; i < parts.length; i++) {
+            testPath += (i > 0 ? '/' : '') + parts[i];
+            if (isMatches(testPath, rawPkg.location)) {
+                newPkg = deepClone(rawPkg);
+                newPkg.location = testPath;
+                savePackage(newPkg, parentPath);
+                // each time override cache, so in cache is always the most-specific path:
+                cache[modulePath] = newPkg.location;
+                ++foundPackages;
+            }
+        }
+
+        return foundPackages > 0;
+    }
+
+
     // -----------------
+    // Internal logic utilities:
 
     function ensureLocation(pkgOrLocation) {
+        if (!pkgOrLocation) { return ''; }
         if (typeof pkgOrLocation !== 'string') {
             return pkgOrLocation.location;
         } else {
@@ -208,153 +340,31 @@
     }
 
     function isPathPublicForPackage(modulePath, pkg) {
-        return isMatches(modulePath.slice(pkg.location.length + 1), pkg.public); // +1 for slash
+        return isMatches(trimPkgPath(modulePath, pkg), pkg.public);
     }
+
+    function getPkgMainPath(pkg) {
+        return joinPath(pkg.location, pkg.main)
+    }
+
+    function trimPkgPath(modulePath, pkg) {
+        var len = ensureLocation(pkg).length;
+        return len === 0 ? modulePath : modulePath.slice(len + 1); // +1 for slash
+    }
+
 
     // -----------------
+    // Common-purpose utilities (agnostic to plugin logic):
 
-    // check whether given path is inside given package (or inside any package, if no particular package given)
-    function isPathInPackage(modulePath, pkg) {
-        if (modulePath in cache) {
-            return cache[modulePath] !== false;
-        }
+    function defaults(dest, src) { for (var key in src) if (src.hasOwnProperty(key) && !dest.hasOwnProperty(key)) { dest[key] = src[key]; } }
 
-        var result;
-        if (!pkg) {
-            pkg = getPackageForPath(modulePath);
-            result = pkg !== false;
-        } else {
-            result = isParent(pkg, modulePath);
-        }
+    function trimSlash(str) { return str.replace(/^\/|\/$/g, ''); }
 
-        return result;
+    function joinPath() {
+        var path = '', i, part;
+        for (i in arguments) { part = arguments[i]; if (part != null) { path += part + '/'; } }
+        return trimSlash(path);
     }
-
-    // find _first_ module whose location given module path matches to
-    function getPackageForPath(modulePath) {
-        if (modulePath in packages) {
-            return packages[modulePath];
-        }
-
-        if (modulePath in cache) {
-            return cache[modulePath] !== false ? packages[cache[modulePath]] : false;
-        }
-
-        for (var pkgPath in packages) {
-            var pkg = packages[pkgPath];
-            if (isPathInPackage(modulePath, pkg)) {
-                var parentPkg;
-                while (pkg && pkg.packages) {
-                    parentPkg = pkg;
-                    pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
-                }
-                pkg = pkg || parentPkg;
-                cache[modulePath] = pkg.location;
-                return pkg;
-            }
-        }
-
-        if (pkg = parseMultipathPackages(modulePath, rawPackages)) {
-            return pkg;
-        }
-
-        cache[modulePath] = false;
-        return false;
-    }
-
-    function parseMultipathPackages(modulePath, rawPkgs, parentPath) {
-        for (var i = 0; i < rawPkgs.length; i++) {
-            var rawPkg = rawPkgs[i];
-            if (parseMultipathPackage(modulePath, rawPkg, parentPath)) {
-                return getPackageForPath(modulePath);
-            }
-        }
-        return false;
-    }
-
-    // Match module path against multi-paths package and store all found matches as separate "single-path" packages.
-    // Checks all possible subpaths of source path, level-by-level from root
-    function parseMultipathPackage(modulePath, rawPkg, parentPath) {
-        var testPath = "",
-            newPkg,
-            foundPackages = 0;
-
-        parentPath || (parentPath = '');
-        if (parentPath.length > 0) { parentPath += '/' }
-
-        var parts = (!parentPath ? modulePath : modulePath.slice(parentPath.length)).split('/');
-
-        //console.log("parse " + modulePath + ' inside ' + parentPath);
-        for (var i = 0; i < parts.length; i++) {
-            if (i > 0) { testPath += '/'; }
-            testPath += parts[i];
-
-            if (isMatches(testPath, rawPkg.location)) {
-                newPkg = deepClone(rawPkg);
-                newPkg.location = parentPath + testPath;
-                packages[newPkg.location] = newPkg;
-                if (parentPath.length > 0) {
-                    parents[newPkg.location] = rtrimSlash(parentPath);
-                    parents[newPkg.location + '/' + newPkg.main] = rtrimSlash(parentPath);
-                }
-                // each time override cache, so in cache is always the most-specific path:
-                cache[modulePath] = newPkg.location;
-
-                cache[newPkg.location] = newPkg.location;
-                cache[newPkg.location + '/' + newPkg.main] = newPkg.location;
-
-                ++foundPackages;
-            }
-        }
-
-        return foundPackages > 0;
-    }
-
-    function isPathAccessibleFromInsidePackage(modulePath, pkg) {
-        var modulePkg = getPackageForPath(modulePath);
-
-        var result = false;
-
-        if (modulePkg === false) {
-            result = isMatches(modulePath, pkg.external);
-        } else {
-            console.log('check for from inside:', modulePath, pkg.location, modulePkg.location);
-            console.log('pkgs equal:', modulePkg === pkg);
-            console.log('isParent:', isParent(pkg, modulePkg));
-            console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));
-            console.log('Rel to pub:', modulePath.slice(modulePkg.location.length + 1), modulePkg.public);
-            result = (modulePkg === pkg)
-                    || (isParent(pkg, modulePkg, true)
-                        && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
-                            || isPathPublicForPackage(modulePath, modulePkg)
-                            )
-                        )
-        }
-
-        return result;
-    }
-
-    function isPathAccessibleFromOutsidePackage(modulePath, pkg) {
-        var modulePkg = getPackageForPath(modulePath);
-        //console.log('check for from outside:',  modulePath, modulePkg.location, pkg.location);
-        if (modulePkg !== pkg) {
-            return true;
-        }
-
-        /*return (modulePath === pkg.location)
-            || (modulePath === pkg.location + '/' + pkg.main)
-            || (!hasParents(pkg) && isPathPublicForPackage(modulePath, pkg));*/
-
-        //console.log("has parents", hasParents(pkg));
-        return !hasParents(pkg)
-                && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
-                    || isPathPublicForPackage(modulePath, pkg));
-
-    }
-
-    // -----------------
-
-    // Some utils
 
     function deepClone(obj) {
         var clone = {};
@@ -370,10 +380,6 @@
         }
         return clone;
     }
-
-    function defaults(dest, src) { for (var key in src) if (src.hasOwnProperty(key) && !dest.hasOwnProperty(key)) { dest[key] = src[key]; } }
-
-    function rtrimSlash(str) { return str.replace(/\/$/, ''); }
 
     // -----------------
 
