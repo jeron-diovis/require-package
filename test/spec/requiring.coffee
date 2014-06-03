@@ -51,24 +51,26 @@ describe "requiring packages", ->
             location: "public_pkg"
             public: /^pub_/
             packages:
-              location: /^nested_\w+$/
-              #location: "nested_pkg"
+              #location: /^nested_\w+$/
+              location: "nested_pkg"
+              name: 'NESTED'
               # TODO: when location is a string, it works without "public" below
-              public: /^pub_/
+              public: /^pub_nested_/
 
-          define "public_pkg/main", -> require "public_pkg/nested_pkg/pub_internal"
 
           define "public_pkg/internal", -> "Secret!"
           define "public_pkg/pub_internal", -> "Available"
 
-          define "public_pkg/nested_pkg/internal", -> "Nested Secret!"
-          define "public_pkg/nested_pkg/pub_internal", -> "Nested Available"
-
-          expect(-> require "public_pkg/internal").to.throw /denied/, "Private file is available"
+          expect(-> require "public_pkg/internal").to.throw Error, /internal.*outside.*denied/, "Private file is available"
           expect(require "public_pkg/pub_internal").is.equal "Available", "Public file is not available"
 
+
+          define "public_pkg/main", -> require "public_pkg/nested_pkg/pub_nested_internal"
+          define "public_pkg/nested_pkg/internal", -> "Nested Secret!"
+          define "public_pkg/nested_pkg/pub_nested_internal", -> "Nested Available"
+
+          expect(-> require "public_pkg/nested_pkg/pub_nested_internal").to.throw Error, /internal.*outside.*denied/, "Child's private files are available from external module"
           expect(require "public_pkg").is.equal "Nested Available", "Child's public files are not available to parent"
-          expect(-> require "public_pkg/nested_pkg/pub_internal").to.throw /denied/, "Child's private files are available from external module"
 
     describe "from inside package", ->
       it "should be allowed", ->
@@ -107,7 +109,7 @@ describe "requiring packages", ->
           location: "test_pkg"
           packages:
             location: /^nested_\w+$/
-            packages: /^depths_\w+$/
+            packages: /^deep_\w+$/
 
         # some workaround to test function execution results without sinon
         error = null
@@ -121,9 +123,9 @@ describe "requiring packages", ->
           catch e
             error = e
 
-        define "test_pkg/nested_pkg/main", -> require "test_pkg/nested_pkg/depths_deep"
+        define "test_pkg/nested_pkg/main", -> require "test_pkg/nested_pkg/deep_pkg"
         define "test_pkg/nested_pkg/internal", -> "Still secret!"
-        define "test_pkg/nested_pkg/depths_deep/main", -> "we need to go deeper"
+        define "test_pkg/nested_pkg/deep_pkg/main", -> "we need to go deeper"
 
         require "test_pkg"
         expect(childMain).is.equal "we need to go deeper"

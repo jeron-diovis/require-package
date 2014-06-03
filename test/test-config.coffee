@@ -32,7 +32,7 @@ do ->
     extend cfg,
       "main": "main"
       "public": false
-      "externals": false
+      "external": false
       "packages": false
       "inheritable": false
 

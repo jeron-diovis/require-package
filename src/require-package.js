@@ -2,8 +2,8 @@
 
     var cache = {}, // map module name to package location
         packages = {}, // map package location to full package config
-        rawPackages = [], // "multi-packages", where location is regexp or function
-                          // it produces new value for "packages" hash on every new path match
+        multiPackages = [],// packages, where location is regexp or function, so it matches multiple path
+                           // it produces new value for "packages" hash on every new path match
         parents = {}; // map module path to _direct_ parent package
 
     var isInitialized = false;
@@ -26,7 +26,7 @@
 
             // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
             // But it will be verbose enough (as need to clone functions and regexps)
-            rawPackages = parseRawPackages(pkgs);
+            multiPackages = parseRawPackages(pkgs);
             return true;
         }
     };
@@ -42,7 +42,7 @@
         var parentPath = modulesStack[modulesStack.length - 1];
         ensurePathAccessible(modulePath, parentPath);
 
-        var module, modulePkg = getPackageForPath(modulePath);
+        var mmodule, modulePkg = getPackageForPath(modulePath);
         //console.log('REQ:', modulePath, parentPath, modulePkg.location);
 
         if (modulePkg !== false) {
@@ -53,13 +53,13 @@
 
         modulesStack.push(modulePath);
         try {
-            module = oldRequire(modulePath);
+            mmodule = oldRequire(modulePath);
         } finally {
             // always return stack to previous state,
             // to avoid cumulative effects when chain of "require"s throws error somewhere in depths
             modulesStack.pop();
         }
-        return module;
+        return mmodule;
     }
 
     require.packages = options;
@@ -163,7 +163,9 @@
             } else {
                 pkg = { location: rawPkg };
             }
+            //console.log('before defaults:', pkg);
             defaults(pkg, options.defaults);
+            //console.log('after defaults:', pkg);
 
             if (typeof pkg.location === 'string') {
                 savePackage(pkg, parentLocation);
@@ -191,6 +193,7 @@
         var mainFilePath = getPkgMainPath(pkg);
 
         packages[pkg.location] = pkg;
+        internal.insertPackage(pkg);
 
         cache[pkg.location] = pkg.location;
         cache[mainFilePath] = pkg.location;
@@ -200,23 +203,6 @@
             parents[mainFilePath] = parentLocation;
         }
         return pkg;
-    }
-
-    // check whether given path is inside given package (or inside any package, if no particular package given)
-    function isPathInPackage(modulePath, pkg) {
-        if (modulePath in cache) {
-            return cache[modulePath] !== false;
-        }
-
-        var result;
-        if (!pkg) {
-            pkg = getPackageForPath(modulePath);
-            result = pkg !== false;
-        } else {
-            result = isParent(pkg, modulePath);
-        }
-
-        return result;
     }
 
     // find module whose location given module path matches to
@@ -229,21 +215,18 @@
             return cache[modulePath] !== false ? packages[cache[modulePath]] : false;
         }
 
-        for (var pkgPath in packages) {
-            var pkg = packages[pkgPath];
-            if (isPathInPackage(modulePath, pkg)) {
-                var parentPkg;
-                while (pkg && pkg.packages) {
-                    parentPkg = pkg;
-                    pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
-                }
-                pkg = pkg || parentPkg;
-                cache[modulePath] = pkg.location;
-                return pkg;
+        var pkg, parentPkg;
+        if ((pkg = internal.findClosestPackage(modulePath)) !== false) {
+            while (pkg && pkg.packages) {
+                parentPkg = pkg;
+                pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
             }
+            pkg = pkg || parentPkg;
+            cache[modulePath] = pkg.location;
+            return pkg;
         }
 
-        if (pkg = parseMultipathPackages(modulePath, rawPackages)) {
+        if (pkg = parseMultipathPackages(modulePath, multiPackages)) {
             return pkg;
         }
 
@@ -271,6 +254,7 @@
         for (var i = 0; i < parts.length; i++) {
             testPath += (i > 0 ? '/' : '') + parts[i];
             if (isMatches(testPath, rawPkg.location)) {
+                //console.log('clone pkg:', testPath, rawPkg);
                 newPkg = deepClone(rawPkg);
                 newPkg.location = testPath;
                 savePackage(newPkg, parentPath);
@@ -282,6 +266,58 @@
 
         return foundPackages > 0;
     }
+
+    // Mechanism for quick search closest parent package for any module path.
+    // Keeps all found packages locations sorted by path length,
+    // to immediately start search from lengths, closest to given path length,
+    // without overhead of iterating through obviously non-matched paths.
+    var internal = (function () {
+        var sortedLocations = [];
+        var sortedLengths = [-Infinity, Infinity];
+        var lengthToIndex = {}; // { path length : index of last path with such length in sortedLocations }
+
+        function findClosestIndex(pathLength) {
+            for (var i = 0; i < sortedLengths.length - 1; i++) {
+                if (pathLength > sortedLengths[i] && pathLength < sortedLengths[i + 1]) { return i; }
+            }
+            return -1;
+        }
+
+        // index of module path in sortedLocations, if it would be saved there
+        function getSortedIndex(modulePath) {
+            var len = pathLength(modulePath);
+            if (!(len in lengthToIndex)) {
+                var i = findClosestIndex(len);
+                sortedLengths.splice(i + 1, 0, len);
+                var prev = lengthToIndex[sortedLengths[i]];
+                lengthToIndex[len] = (prev != null ? prev : -1);
+            }
+            return lengthToIndex[len];
+        }
+
+        return {
+            // save new found package to sorted locations list
+            // so it can be recognized as someones parent later
+            insertPackage: function (pkg) {
+                var location = pkg.location;
+                sortedLocations.splice(getSortedIndex(location) + 1, 0, location);
+                var len = pathLength(location);
+                // as new path inserted, positions of all longer paths are cascadely increased
+                for (var i in lengthToIndex) { if (i >= len) { ++lengthToIndex[i]; } }
+            },
+
+            findClosestPackage: function (modulePath) {
+                if (sortedLocations.length === 0) { return false; } // yet no packages at all, so no parents can be
+                for (var i = getSortedIndex(modulePath); i >= 0; i--) {
+                    if (isParent(sortedLocations[i], modulePath)) {
+                        parents[modulePath] = sortedLocations[i];
+                        return packages[sortedLocations[i]];
+                    }
+                }
+                return false;
+            }
+        }
+    })();
 
 
     // -----------------
@@ -330,9 +366,7 @@
         }
     }
 
-    function hasParents(pkg) {
-        return ensureLocation(pkg) in parents;
-    }
+    function hasParents(pkg) { return ensureLocation(pkg) in parents; }
 
     function isPathLeadsToMainFileOfPackage(modulePath, pkg) {
         return modulePath === pkg.location
@@ -343,9 +377,7 @@
         return isMatches(trimPkgPath(modulePath, pkg), pkg.public);
     }
 
-    function getPkgMainPath(pkg) {
-        return joinPath(pkg.location, pkg.main)
-    }
+    function getPkgMainPath(pkg) { return joinPath(pkg.location, pkg.main) }
 
     function trimPkgPath(modulePath, pkg) {
         var len = ensureLocation(pkg).length;
@@ -359,6 +391,8 @@
     function defaults(dest, src) { for (var key in src) if (src.hasOwnProperty(key) && !dest.hasOwnProperty(key)) { dest[key] = src[key]; } }
 
     function trimSlash(str) { return str.replace(/^\/|\/$/g, ''); }
+
+    function pathLength(modulePath) { return modulePath.split('/').length; }
 
     function joinPath() {
         var path = '', i, part;
