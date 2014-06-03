@@ -16,7 +16,18 @@
             "external": false, // external files, allowed to be required from inside package
             "packages": false, // nested packages
             // TODO: implement this:
-            "inheritable": false // package's internal files, available from inside nested packages
+            "protected": false, // package's internal files, available from inside nested packages
+
+            // props, which are true here, will be used as defaults for packages inside current one
+            // (means, will be applied *before* global defaults, but not instead of them)
+            "inheritable": {
+                "main": false,
+                "public": false,
+                "external": false,
+                "packages": false,
+                "protected": false,
+                "inheritable": true
+            }
         },
         init: function(pkgs) {
             if (isInitialized) {
@@ -43,7 +54,6 @@
         ensurePathAccessible(modulePath, parentPath);
 
         var mmodule, modulePkg = getPackageForPath(modulePath);
-        //console.log('REQ:', modulePath, parentPath, modulePkg.location);
 
         if (modulePkg !== false) {
             if (modulePath === modulePkg.location) {
@@ -114,6 +124,7 @@
 
         if (modulePkg === false) {
             // TODO: restrict 'external' to only non-packaged files
+            // or, maybe, to only parent's externals
             return isMatches(modulePath, pkg.external);
         }
 
@@ -146,7 +157,7 @@
     // -----------------
     // The heart. Parsing, saving, mapping, caching packages:
 
-    function parseRawPackages(pkgs, parentLocation) {
+    function parseRawPackages(pkgs, parent) {
         var pkg, rawPkg;
 
         if (pkgs.constructor !== Array) {
@@ -163,19 +174,19 @@
             } else {
                 pkg = { location: rawPkg };
             }
-            //console.log('before defaults:', pkg);
+
+            if (parent) { inherit(pkg, parent); }
             defaults(pkg, options.defaults);
-            //console.log('after defaults:', pkg);
 
             if (typeof pkg.location === 'string') {
-                savePackage(pkg, parentLocation);
+                savePackage(pkg, parent ? parent.location : null);
                 pkgs.splice(i, 1); // remove saved from raw set
             } else {
                 pkgs[i] = pkg;
                 ++i;
             }
             if (pkg.packages) {
-                pkg.packages = parseRawPackages(pkg.packages, pkg.location);
+                pkg.packages = parseRawPackages(pkg.packages, pkg);
                 if (pkg.packages.length === 0) {
                     pkg.packages = false;
                 }
@@ -183,6 +194,17 @@
         }
 
         return pkgs;
+    }
+
+    function inherit(child, parent) {
+        var props = {};
+        for (var key in parent.inheritable) {
+            if (parent.inheritable[key] === true) {
+                props[key] = parent[key];
+            }
+        }
+        defaults(child, props);
+        return child;
     }
 
     function savePackage(pkg, parent) {
@@ -388,7 +410,22 @@
     // -----------------
     // Common-purpose utilities (agnostic to plugin logic):
 
-    function defaults(dest, src) { for (var key in src) if (src.hasOwnProperty(key) && !dest.hasOwnProperty(key)) { dest[key] = src[key]; } }
+    function isObject(obj) { return typeof obj === 'object' && obj.constructor === Object; }
+
+    function defaults(dest) {
+        var sources = [].slice.call(arguments, 1);
+        for (var i = 0; i < sources.length; i++) {
+            var src = sources[i];
+            for (var key in src) if (src.hasOwnProperty(key)) {
+                if (!dest.hasOwnProperty(key)) {
+                    dest[key] = isObject(src[key]) ? deepClone(src[key]) : src[key];
+                } else if (isObject(dest[key])) {
+                    defaults(dest[key], src[key]);
+                }
+            }
+        }
+        return dest;
+    }
 
     function trimSlash(str) { return str.replace(/^\/|\/$/g, ''); }
 
@@ -406,7 +443,7 @@
             var val = obj[prop];
             if (val.constructor === Array) {
                 clone[prop] = val.slice();
-            } else if (typeof val === 'object' && val.constructor === Object) {
+            } else if (isObject(val)) {
                 clone[prop] = deepClone(val);
             } else {
                 clone[prop] = val;

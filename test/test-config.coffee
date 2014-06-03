@@ -34,6 +34,13 @@ do ->
       "public": false
       "external": false
       "packages": false
-      "inheritable": false
+      "protected": false
+      "inheritable":
+        "main": false
+        "public": false
+        "external": false
+        "packages": false
+        "protected": false
+        "inheritable": true
 
   afterEach -> require.packages.defaults = clone prevCfg

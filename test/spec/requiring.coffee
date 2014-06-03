@@ -51,10 +51,7 @@ describe "requiring packages", ->
             location: "public_pkg"
             public: /^pub_/
             packages:
-              #location: /^nested_\w+$/
               location: "nested_pkg"
-              name: 'NESTED'
-              # TODO: when location is a string, it works without "public" below
               public: /^pub_nested_/
 
 
@@ -79,6 +76,9 @@ describe "requiring packages", ->
         define "test/main/internal", -> "Secret!"
         expect(require "test").is.equal "Secret!"
 
+    # TODO: test "protected" option (child-to-parent access)
+    #describe "from children package", ->
+    #  it "should be allowed only for parent's 'protected' files", ->
 
   describe "access to external files from inside package", ->
     it "should be denied by default", ->
@@ -100,6 +100,9 @@ describe "requiring packages", ->
 
       expect(require "packages/with_externals").is.deep.equal utils: "utils", support: "support"
 
+    # TODO: test "external" option that is is restricted to parent's one only
+    #describe "from nested package", ->
+    #  it "should be restricted only to parent's 'external' files", ->
 
 
   describe "nested packages access", ->
@@ -131,5 +134,7 @@ describe "requiring packages", ->
         expect(childMain).is.equal "we need to go deeper"
         expect(childPrivate).is.null
         expect(error).is.an.instanceOf Error
+
+    # TODO: test inheritance settings
 
  # describe "from children to parent", ->
