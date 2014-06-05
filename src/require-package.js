@@ -23,10 +23,10 @@
             "inheritable": {
                 "main": false,
                 "public": false,
-                "external": false,
                 "packages": false,
                 "protected": false,
                 "inheritable": true
+                // "external" is not listed here, as it is denied for children to have own external dependencies
             }
         },
         init: function(pkgs) {
@@ -96,15 +96,12 @@
         }
         // we are inside some package:
         else {
-            // requiring something outside of all packages:
-            if (modulePkg === false) {
-                if (!isPathAccessibleFromInsidePackage(modulePath, currentPkg)) {
+            if (!isPathAccessibleFromInsidePackage(modulePath, currentPkg)) {
+                // requiring something outside of all packages:
+                if (modulePkg === false) {
                     error = 'Access to out-of-package files from inside packages';
-                }
-            }
-            // requiring something inside some package:
-            else {
-                if (!isPathAccessibleFromInsidePackage(modulePath, currentPkg)) {
+                } else {
+                // requiring something inside another package:
                     error = 'Cross-package access';
                 }
             }
@@ -118,39 +115,40 @@
         return true;
     }
 
-    // whether we can require @modulePath, when we are inside @pkg:
-    function isPathAccessibleFromInsidePackage(modulePath, pkg) {
-        var modulePkg = getPackageForPath(modulePath);
+    // whether we can require @modulePath, when we are inside @currentPkg:
+    function isPathAccessibleFromInsidePackage(modulePath, currentPkg) {
+        var targetPkg = getPackageForPath(modulePath);
 
-        if (modulePkg === false) {
-            // TODO: restrict 'external' to only non-packaged files
-            // or, maybe, to only parent's externals
-            return isMatches(modulePath, pkg.external);
+        // When requiring module that is not in any package:
+        // only paths from 'external' list are allowed,
+        // and if current package is nested - than only parent's external files.
+        // Because should be only one entry point for externals.
+        if (targetPkg === false) {
+            return isMatches(modulePath, (hasParents(currentPkg) ? internal.findFarthestParent(currentPkg) : currentPkg).external);
         }
 
-        /*console.log('check for from inside:', modulePath, pkg.location, modulePkg.location);
-         console.log('pkgs equal:', modulePkg === pkg);
-         console.log('isParent:', isParent(pkg, modulePkg));
-         console.log('isLeadsToMain:', isPathLeadsToMainFileOfPackage(modulePath, modulePkg));
-         console.log('Rel to pub:', modulePath.slice(modulePkg.location.length + 1), modulePkg.public);*/
-        return (modulePkg === pkg)
-            || (isParent(pkg, modulePkg, true)
-                && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg)
-                    || isPathPublicForPackage(modulePath, modulePkg)));
+        // When requiring module from some package:
+        return (targetPkg === currentPkg)                                     // own files are allowed, of course
+            || (isParent(currentPkg, targetPkg, true)                         // when parent requires child's files:
+                && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)     // - it can require main file
+                    || pathForPackageIs('public', modulePath, targetPkg)))    // - or explicitly exposed files
+            || (isParent(targetPkg, currentPkg, true)                         // when child requires parent's files:
+                && (!isPathLeadsToMainFileOfPackage(modulePath, currentPkg)   // - it can NOT require main file, because it is a top-level logic
+                    && pathForPackageIs('protected', modulePath, targetPkg))) // - and can require only explicitly allowed files ('protected', in OOP sense)
+            ;
     }
 
     // whether we can require @modulePath, when we are outside of ANY package:
     function isPathAccessibleFromOutsidePackage(modulePath) {
-        var modulePkg = getPackageForPath(modulePath);
+        var targetPkg = getPackageForPath(modulePath);
 
         // it's also some external file - don't care about it:
-        if (modulePkg === false) { return true; }
+        if (targetPkg === false) { return true; }
 
-        //console.log("has parents", hasParents(pkg));
         // it's file inside some package - so:
-        return !hasParents(modulePkg)                                 // it can be available only if it is not nested package
-            && (isPathLeadsToMainFileOfPackage(modulePath, modulePkg) // and it is package itself (main file),
-                || isPathPublicForPackage(modulePath, modulePkg));    //     or one of it's explicitly exposed files
+        return !hasParents(targetPkg)                                  // it can be available only if it is not nested package (and no matter to 'public' lists hierarchy!)
+            && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)  // and it is package itself (main file),
+                || pathForPackageIs('public', modulePath, targetPkg)); // or one of it's explicitly exposed files
     }
 
 
@@ -179,7 +177,7 @@
             defaults(pkg, options.defaults);
 
             if (typeof pkg.location === 'string') {
-                savePackage(pkg, parent ? parent.location : null);
+                savePackage(pkg, parent);
                 pkgs.splice(i, 1); // remove saved from raw set
             } else {
                 pkgs[i] = pkg;
@@ -209,8 +207,11 @@
 
     function savePackage(pkg, parent) {
         var parentLocation = trimSlash(ensureLocation(parent));
+        var hasParent = parentLocation.length > 0;
 
         pkg.location = joinPath(parentLocation, pkg.location);
+
+        ensurePackageCanBeSaved(pkg, parentLocation);
 
         var mainFilePath = getPkgMainPath(pkg);
 
@@ -220,11 +221,24 @@
         cache[pkg.location] = pkg.location;
         cache[mainFilePath] = pkg.location;
 
-        if (parentLocation.length > 0) {
+        if (hasParent) {
             parents[pkg.location] = parentLocation;
             parents[mainFilePath] = parentLocation;
         }
         return pkg;
+    }
+
+    function ensurePackageCanBeSaved(pkg, parentLocation) {
+        var hasParent = parentLocation.length > 0;
+        if (hasParent) {
+            if (!!pkg.external) {
+                throw new Error(
+                    'Nested packages can\'t have own "external" dependencies. \n' +
+                    'Trace: package "' + pkg.location + '" inside package"' + parentLocation + '" has "external": ' + pkg.external
+                );
+            }
+        }
+        return true;
     }
 
     // find module whose location given module path matches to
@@ -238,7 +252,7 @@
         }
 
         var pkg, parentPkg;
-        if ((pkg = internal.findClosestPackage(modulePath)) !== false) {
+        if ((pkg = internal.findClosestParent(modulePath)) !== false) {
             while (pkg && pkg.packages) {
                 parentPkg = pkg;
                 pkg = parseMultipathPackages(modulePath, parentPkg.packages, parentPkg.location);
@@ -328,11 +342,21 @@
                 for (var i in lengthToIndex) { if (i >= len) { ++lengthToIndex[i]; } }
             },
 
-            findClosestPackage: function (modulePath) {
+            findClosestParent: function (modulePath) {
                 if (sortedLocations.length === 0) { return false; } // yet no packages at all, so no parents can be
                 for (var i = getSortedIndex(modulePath); i >= 0; i--) {
                     if (isParent(sortedLocations[i], modulePath)) {
                         parents[modulePath] = sortedLocations[i];
+                        return packages[sortedLocations[i]];
+                    }
+                }
+                return false;
+            },
+
+            findFarthestParent: function (modulePath) {
+                if (sortedLocations.length === 0) { return false; }
+                for (var i = 0; i < sortedLocations.length; i++) {
+                    if (isParent(sortedLocations[i], modulePath)) {
                         return packages[sortedLocations[i]];
                     }
                 }
@@ -392,11 +416,11 @@
 
     function isPathLeadsToMainFileOfPackage(modulePath, pkg) {
         return modulePath === pkg.location
-            || (isParent(pkg, modulePath) && modulePath.slice(-pkg.main.length) === pkg.main)
+            || (isParent(pkg, modulePath, true) && modulePath.slice(-pkg.main.length) === pkg.main)
     }
 
-    function isPathPublicForPackage(modulePath, pkg) {
-        return isMatches(trimPkgPath(modulePath, pkg), pkg.public);
+    function pathForPackageIs(type, modulePath, pkg) {
+        return isMatches(trimPkgPath(modulePath, pkg), pkg[type]);
     }
 
     function getPkgMainPath(pkg) { return joinPath(pkg.location, pkg.main) }

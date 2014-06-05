@@ -76,9 +76,36 @@ describe "requiring packages", ->
         define "test/main/internal", -> "Secret!"
         expect(require "test").is.equal "Secret!"
 
-    # TODO: test "protected" option (child-to-parent access)
-    #describe "from children package", ->
-    #  it "should be allowed only for parent's 'protected' files", ->
+    describe "for nested packages", ->
+      describe "from child to parent", ->
+        it "should be available *only* parent's 'protected' files", ->
+          require.packages.init
+            location: "parent"
+            protected: "protected"
+            public: /.*/ # just for test
+            packages:
+              location: "child"
+              public: /.*/
+
+          define "parent/protected", -> "Available"
+          define "parent/private", -> "Denied!"
+          define "parent/public", -> "Also denied!"
+
+          define "parent/proxyProtected", -> require "parent/child/protectedLoader"
+          define "parent/proxyPrivate", -> require "parent/child/privateLoader"
+          define "parent/proxyPublic", -> require "parent/child/publicLoader"
+          define "parent/proxySelf", -> require "parent/child/parentLoader"
+
+          define "parent/child/protectedLoader", -> require "parent/protected"
+          define "parent/child/privateLoader", -> require "parent/private"
+          define "parent/child/publicLoader", -> require "parent/public"
+          define "parent/child/parentLoader", -> require "parent"
+
+          expect(require "parent/proxyProtected").is.equal "Available", "Parent's 'protected' file is not available for child"
+          expect(-> require "parent/proxyPrivate").to.throw Error, /Cross-package.*denied/, "Parent's private file is available for child"
+          expect(-> require "parent/proxyPublic").to.throw Error, /Cross-package.*denied/, "Parent's public-only file is available for child"
+          expect(-> require "parent/proxySelf").to.throw Error, /Cross-package.*denied/, "Parent's package itself is available for child"
+
 
   describe "access to external files from inside package", ->
     it "should be denied by default", ->
@@ -100,10 +127,41 @@ describe "requiring packages", ->
 
       expect(require "packages/with_externals").is.deep.equal utils: "utils", support: "support"
 
-    # TODO: test "external" option that is is restricted to parent's one only
-    #describe "from nested package", ->
-    #  it "should be restricted only to parent's 'external' files", ->
+    describe "for nested packages", ->
+      it "should be denied to declare own external dependencies", ->
+        init = -> require.packages.init
+          location: "parent"
+          external: "utils"
+          packages:
+            location: "child"
+            external: "helpers"
 
+        expect(init).to.throw Error, /Nested packages can\'t have own "external" dependencies/, "Nested packages can declare own external dependencies"
+
+      it "should be available all the topmost parent's external dependencies", ->
+        require.packages.init
+          location: "parent"
+          external: /^external\//
+          public: /.*/ # just for test
+          packages:
+            location: "child"
+            public: /.*/
+            packages:
+              location: "grandchild"
+
+
+        define "external/utils", -> "some util"
+        define "external/helpers", -> "some helper"
+
+        define "parent/child/utilsLoader", -> require "external/utils"
+        define "parent/child/helpersLoader", -> require "parent/child/grandchild"
+        define "parent/child/grandchild/main", -> require "external/helpers"
+
+        define "parent/proxyUtils", -> require "parent/child/utilsLoader"
+        define "parent/proxyHelpers", -> require "parent/child/helpersLoader"
+
+        expect(require "parent/proxyUtils").is.equal "some util", "Nested package can't access parent's external dependencies"
+        expect(require "parent/proxyHelpers").is.equal "some helper", "Deep nested package can't access root parent's external dependencies"
 
   describe "nested packages access", ->
     describe "from parent to children", ->
