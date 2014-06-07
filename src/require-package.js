@@ -1,10 +1,10 @@
 (function (global) {
 
-    var cache = {}, // map module name to package location
-        packages = {}, // map package location to full package config
-        multiPackages = [],// packages, where location is regexp or function, so it matches multiple path
-                           // it produces new value for "packages" hash on every new path match
-        parents = {}; // map module path to _direct_ parent package
+    var cache = {},         // map module name to package location
+        packages = {},      // map package location to full package config
+        multiPackages = [], // packages, where location is regexp or function, so it matches multiple paths
+                            // it produces new value for "packages" hash on every new path match
+        parents = {};       // map module path to *direct* parent package
 
     var isInitialized = false;
 
@@ -12,13 +12,12 @@
         defaults: {
             "main": "main",
             // Following options can be: string|regexp|function|array of all of these things
-            "public": false, // package's internal files, available from outside of package
-            "external": false, // external files, allowed to be required from inside package
-            "packages": false, // nested packages
-            // TODO: implement this:
+            "public": false,    // package's internal files, available from outside of package
+            "external": false,  // external files, allowed to be required from inside package
+            "packages": false,  // nested packages
             "protected": false, // package's internal files, available from inside nested packages
 
-            // props, which are true here, will be used as defaults for packages inside current one
+            // props, which are "true" here, will be used as defaults for packages inside current one
             // (means, will be applied *before* global defaults, but not instead of them)
             "inheritable": {
                 "main": false,
@@ -167,7 +166,7 @@
         var i = 0;
         while (i < pkgs.length) {
             rawPkg = pkgs[i];
-            if (typeof rawPkg === 'object' && rawPkg.constructor === Object) {
+            if (isObject(rawPkg)) {
                 pkg = rawPkg;
             } else {
                 pkg = { location: rawPkg };
@@ -285,12 +284,10 @@
     function parseMultipathPackage(modulePath, rawPkg, parentPath) {
         var testPath = '', newPkg, foundPackages = 0;
 
-        //console.log("parse " + modulePath + ' inside ' + parentPath);
         var parts = trimPkgPath(modulePath, parentPath).split('/');
         for (var i = 0; i < parts.length; i++) {
             testPath += (i > 0 ? '/' : '') + parts[i];
             if (isMatches(testPath, rawPkg.location)) {
-                //console.log('clone pkg:', testPath, rawPkg);
                 newPkg = deepClone(rawPkg);
                 newPkg.location = testPath;
                 savePackage(newPkg, parentPath);
@@ -436,6 +433,16 @@
 
     function isObject(obj) { return typeof obj === 'object' && obj.constructor === Object; }
 
+    function trimSlash(str) { return str.replace(/^\/+|\/+$/g, ''); }
+
+    function pathLength(modulePath) { return modulePath.split('/').length; }
+
+    function joinPath() {
+        var path = '', i, part;
+        for (i in arguments) { part = arguments[i]; if (part != null) { path += part + '/'; } }
+        return trimSlash(path);
+    }
+
     function defaults(dest) {
         var sources = [].slice.call(arguments, 1);
         for (var i = 0; i < sources.length; i++) {
@@ -449,16 +456,6 @@
             }
         }
         return dest;
-    }
-
-    function trimSlash(str) { return str.replace(/^\/|\/$/g, ''); }
-
-    function pathLength(modulePath) { return modulePath.split('/').length; }
-
-    function joinPath() {
-        var path = '', i, part;
-        for (i in arguments) { part = arguments[i]; if (part != null) { path += part + '/'; } }
-        return trimSlash(path);
     }
 
     function deepClone(obj) {

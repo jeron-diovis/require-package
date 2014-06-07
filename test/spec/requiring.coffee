@@ -52,7 +52,7 @@ describe "requiring packages", ->
             public: /^pub_/
             packages:
               location: "nested_pkg"
-              public: /^pub_nested_/
+              public: /^nested_pub_/
 
 
           define "public_pkg/internal", -> "Secret!"
@@ -62,11 +62,11 @@ describe "requiring packages", ->
           expect(require "public_pkg/pub_internal").is.equal "Available", "Public file is not available"
 
 
-          define "public_pkg/main", -> require "public_pkg/nested_pkg/pub_nested_internal"
+          define "public_pkg/main", -> require "public_pkg/nested_pkg/nested_pub_internal"
           define "public_pkg/nested_pkg/internal", -> "Nested Secret!"
-          define "public_pkg/nested_pkg/pub_nested_internal", -> "Nested Available"
+          define "public_pkg/nested_pkg/nested_pub_internal", -> "Nested Available"
 
-          expect(-> require "public_pkg/nested_pkg/pub_nested_internal").to.throw Error, /internal.*outside.*denied/, "Child's private files are available from external module"
+          expect(-> require "public_pkg/nested_pkg/nested_pub_internal").to.throw Error, /internal.*outside.*denied/, "Child's private files are available from external module"
           expect(require "public_pkg").is.equal "Nested Available", "Child's public files are not available to parent"
 
     describe "from inside package", ->
@@ -162,37 +162,3 @@ describe "requiring packages", ->
 
         expect(require "parent/proxyUtils").is.equal "some util", "Nested package can't access parent's external dependencies"
         expect(require "parent/proxyHelpers").is.equal "some helper", "Deep nested package can't access root parent's external dependencies"
-
-  describe "nested packages access", ->
-    describe "from parent to children", ->
-      it "should be allowed for children's main files", ->
-        require.packages.init
-          location: "test_pkg"
-          packages:
-            location: /^nested_\w+$/
-            packages: /^deep_\w+$/
-
-        # some workaround to test function execution results without sinon
-        error = null
-        childMain = null
-        childPrivate = null
-
-        define "test_pkg/main", ->
-          childMain = require "test_pkg/nested_pkg"
-          try
-            childPrivate = require "test_pkg/nested_pkg/internal"
-          catch e
-            error = e
-
-        define "test_pkg/nested_pkg/main", -> require "test_pkg/nested_pkg/deep_pkg"
-        define "test_pkg/nested_pkg/internal", -> "Still secret!"
-        define "test_pkg/nested_pkg/deep_pkg/main", -> "we need to go deeper"
-
-        require "test_pkg"
-        expect(childMain).is.equal "we need to go deeper"
-        expect(childPrivate).is.null
-        expect(error).is.an.instanceOf Error
-
-    # TODO: test inheritance settings
-
- # describe "from children to parent", ->

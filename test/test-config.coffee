@@ -38,7 +38,6 @@ do ->
       "inheritable":
         "main": false
         "public": false
-        "external": false
         "packages": false
         "protected": false
         "inheritable": true
