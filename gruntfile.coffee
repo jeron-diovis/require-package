@@ -7,7 +7,7 @@ module.exports = (grunt) ->
       dist: "dist"
       src: "src/<%=pkg.name %>.js"
       tests: [
-        "<%=rig.testEnv.dest %>"
+        "<%=rig.test.dest %>"
         "test/test-config.coffee"
         "test/spec/**/*.{js,coffee}"
       ]
@@ -23,20 +23,17 @@ module.exports = (grunt) ->
 
 
     rig:
-      global:
-        src:  "src/wrappers/global.js"
-        dest: "<%=pkg.dist %>/<%=pkg.name %>.js"
+      dist:
+        files: ({
+          src: "src/wrappers/#{wrapper}.js"
+          dest: "<%=pkg.dist %>/<%=pkg.name %>#{suffix}.js"
+        } for wrapper, suffix of {
+          "global": ""
+          "module": "-commonjs"
+          "lmd": "-lmd"
+        })
 
-      module:
-        src:  "src/wrappers/module.js"
-        dest: "<%=pkg.dist %>/<%=pkg.name %>-commonjs.js"
-
-      lmd:
-        src:  "src/wrappers/lmd.js"
-        dest: "<%=pkg.dist %>/<%=pkg.name %>-lmd.js"
-
-      # keep it last in list, so it can use other builds
-      testEnv:
+      test:
         src: "test/test-wrapper.js"
         dest: "test/test-build.js"
 
@@ -69,7 +66,7 @@ module.exports = (grunt) ->
         tasks: ["karma:watch:run"]
   }
 
-  grunt.registerTask "setup", "rig"
+  grunt.registerTask "setup", ["rig:dist", "rig:test"]
   grunt.registerTask "start", ["setup", "karma:watch:start", "watch"]
   grunt.registerTask "test", ["setup", "karma:CI"]
 
