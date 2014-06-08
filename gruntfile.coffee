@@ -12,15 +12,26 @@ module.exports = (grunt) ->
         "test/spec/**/*.{js,coffee}"
       ]
 
+
     uglify:
       all:
         expand: yes
-        cwd: "src"
+        cwd: "<%=pkg.dist %>"
         src: "*.js"
-        dest: "<%=pkg.dist %>"
+        dest: "<%=pkg.dist %>/min"
         rename: (dest, src) -> "#{dest}/#{src.replace /\.\w+$/, '.min$&'}"
 
+
     rig:
+      global:
+        src:  "src/wrappers/global.js"
+        dest: "<%=pkg.dist %>/<%=pkg.name %>.js"
+
+      module:
+        src:  "src/wrappers/module.js"
+        dest: "<%=pkg.dist %>/<%=pkg.name %>-commonjs.js"
+
+      # keep it last in list, so it can use other builds
       testEnv:
         src: "test/test-wrapper.js"
         dest: "test/test-build.js"
@@ -54,9 +65,9 @@ module.exports = (grunt) ->
         tasks: ["karma:watch:run"]
   }
 
-  grunt.registerTask "setup", "rig:testEnv"
+  grunt.registerTask "setup", "rig"
   grunt.registerTask "start", ["setup", "karma:watch:start", "watch"]
   grunt.registerTask "test", ["setup", "karma:CI"]
 
-  grunt.registerTask "build", "uglify"
+  grunt.registerTask "build", ["setup", "uglify"]
   grunt.registerTask "default", "build"

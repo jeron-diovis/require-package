@@ -1,4 +1,4 @@
-(function (global) {
+function PatchRequireWithPackages(oldRequire) {
 
     var cache = {},         // map module name to package location
         packages = {},      // map package location to full package config
@@ -43,8 +43,7 @@
 
     // -----------------
 
-    var oldRequire = global.require,
-        modulesStack = ['**root**'];
+    var modulesStack = ['**root**'];
 
     // -----------------
 
@@ -76,7 +75,6 @@
     for (var prop in oldRequire) {
         require[prop] = oldRequire[prop];
     }
-    global.require = require;
 
 
     // -----------------
@@ -475,4 +473,7 @@
 
     // -----------------
 
-})(this);
+    // return patched function
+    return require;
+
+}

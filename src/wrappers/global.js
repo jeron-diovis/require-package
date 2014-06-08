@@ -1,0 +1,2 @@
+//=./factory.js
+(window);

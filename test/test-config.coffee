@@ -6,9 +6,7 @@ require = define = null
 do ->
   makeLoaders = -> do ->
     cache = {}
-    require: (name) ->
-      #console.log "req:", name, cache[name], cache
-      cache[name]?()
+    require: (name) -> cache[name]?()
     define: (name, fn) -> cache[name] = fn
 
   beforeEach -> {require, define} = makeTestEnv(makeLoaders())
