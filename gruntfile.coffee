@@ -31,6 +31,10 @@ module.exports = (grunt) ->
         src:  "src/wrappers/module.js"
         dest: "<%=pkg.dist %>/<%=pkg.name %>-commonjs.js"
 
+      lmd:
+        src:  "src/wrappers/lmd.js"
+        dest: "<%=pkg.dist %>/<%=pkg.name %>-lmd.js"
+
       # keep it last in list, so it can use other builds
       testEnv:
         src: "test/test-wrapper.js"
