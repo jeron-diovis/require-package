@@ -6,11 +6,10 @@ function PatchRequireWithPackages(oldRequire) {
                             // it produces new value for "packages" hash on every new path match
         parents = {};       // map module path to *direct* parent package
 
-    var isInitialized = false;
-
-    var options = {
-        defaults: {
+    var defaultOptions = {
+        "packageDefaults": {
             "main": "main",
+
             // Following options can be: string|regexp|function|array of all of these things
             "public": false,    // package's internal files, available from outside of package
             "external": false,  // external files, allowed to be required from inside package
@@ -18,7 +17,7 @@ function PatchRequireWithPackages(oldRequire) {
             "protected": false, // package's internal files, available from inside nested packages
 
             // props, which are "true" here, will be used as defaults for packages inside current one
-            // (means, will be applied *before* global defaults, but not instead of them)
+            // (means, will be applied *before* global defaults, but not *instead* of them)
             "inheritable": {
                 "main": false,
                 "public": false,
@@ -27,17 +26,6 @@ function PatchRequireWithPackages(oldRequire) {
                 "inheritable": true // whether children of current package will pass theirs inheritance settings to theirs children
                 // "external" is not listed here, as it is denied for children to have own external dependencies
             }
-        },
-        init: function(pkgs) {
-            if (isInitialized) {
-                throw new Error('Packages list already initialized');
-            }
-            isInitialized = true;
-
-            // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
-            // But it will be verbose enough (as need to clone functions and regexps)
-            multiPackages = parseRawPackages(pkgs);
-            return true;
         }
     };
 
@@ -70,7 +58,35 @@ function PatchRequireWithPackages(oldRequire) {
         return mmodule;
     }
 
-    require.packages = options;
+    var isInitialized = false;
+    var isConfigured = false;
+
+    require.packages = {
+        init: function(pkgs) {
+            if (isInitialized) {
+                throw new Error('Packages list already initialized');
+            }
+            isInitialized = true;
+
+            // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
+            // But it will be verbose enough (as need to clone functions and regexps)
+            multiPackages = parseRawPackages(pkgs);
+            return true;
+        },
+
+        configure: function (config) {
+            if (isConfigured) {
+                throw new Error('Packages options already configured');
+            }
+            isConfigured = true;
+            extend(defaultOptions, config);
+        }
+    };
+
+    if ("packages" in oldRequire) {
+        throw new Error("Can't apply 'require-packages' plugin: current 'require' function already has 'packages' property");
+    }
+
     // don't forget to restore other properties
     for (var prop in oldRequire) {
         require[prop] = oldRequire[prop];
@@ -171,7 +187,7 @@ function PatchRequireWithPackages(oldRequire) {
             }
 
             if (parent) { inherit(pkg, parent); }
-            defaults(pkg, options.defaults);
+            defaults(pkg, defaultOptions.packageDefaults);
 
             if (typeof pkg.location === 'string') {
                 savePackage(pkg, parent);
@@ -446,10 +462,27 @@ function PatchRequireWithPackages(oldRequire) {
         for (var i = 0; i < sources.length; i++) {
             var src = sources[i];
             for (var key in src) if (src.hasOwnProperty(key)) {
+                var srcProp = src[key];
                 if (!dest.hasOwnProperty(key)) {
-                    dest[key] = isObject(src[key]) ? deepClone(src[key]) : src[key];
+                    dest[key] = isObject(srcProp) ? deepClone(srcProp) : srcProp;
                 } else if (isObject(dest[key])) {
-                    defaults(dest[key], src[key]);
+                    defaults(dest[key], srcProp);
+                }
+            }
+        }
+        return dest;
+    }
+
+    function extend(dest) {
+        var sources = [].slice.call(arguments, 1);
+        for (var i = 0; i < sources.length; i++) {
+            var src = sources[i];
+            for (var key in src) if (src.hasOwnProperty(key)) {
+                var srcProp = src[key];
+                if (isObject(srcProp) && isObject(dest[key])) {
+                    extend(dest[key], srcProp);
+                } else {
+                    dest[key] = isObject(srcProp) ? deepClone(srcProp) : srcProp;
                 }
             }
         }
