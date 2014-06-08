@@ -1,6 +1,9 @@
 module.exports = (grunt) ->
   require("matchdep").filterDev("grunt-*").forEach grunt.loadNpmTasks
 
+  sysPath = require "path"
+  cfg = grunt.config
+
   grunt.initConfig {
     pkg:
       name: "require-package"
@@ -11,6 +14,7 @@ module.exports = (grunt) ->
         "test/test-config.coffee"
         "test/spec/**/*.{js,coffee}"
       ]
+      sandboxBuilders: "sandbox/builds"
 
 
     uglify:
@@ -64,6 +68,30 @@ module.exports = (grunt) ->
       karma:
         files: "<%=pkg.tests %>"
         tasks: ["karma:watch:run"]
+
+
+    shell:
+      installSandboxBuilders:
+        command: ->
+          builders = [].concat (["cd #{path}", "npm install", "cd -"].join("&&") for path in grunt.file.expand sysPath.join cfg("pkg.sandboxBuilders"), "*")
+          builders.join("&&")
+
+      buildSandbox:
+        command: (builder) ->
+          buildCommand = switch builder
+            when "brunch" then "build"
+            when "lmd"    then "build test"
+            else throw new Error "Unknown sandbox builder: '#{builder}'"
+
+          cfgPath = sysPath.resolve sysPath.join cfg("pkg.sandboxBuilders"), builder
+          binPath = sysPath.join cfgPath, "node_modules/.bin/#{builder}"
+
+          [
+            "cd #{cfgPath}"
+            "#{binPath} #{buildCommand}"
+            "cd -"
+          ].join("&&")
+
   }
 
   grunt.registerTask "setup", ["rig:dist", "rig:test"]
@@ -71,4 +99,18 @@ module.exports = (grunt) ->
   grunt.registerTask "test", ["setup", "karma:CI"]
 
   grunt.registerTask "build", ["setup", "uglify"]
-  grunt.registerTask "default", "build"
+  grunt.registerTask "default", ["build", "sandbox"]
+
+  grunt.registerTask "sandbox", (target = "install", builder = "brunch") ->
+    install = -> grunt.task.run "shell:installSandboxBuilders"
+    build = -> grunt.task.run "shell:buildSandbox:#{builder}"
+
+    unless @args.length
+      install()
+      build()
+      return
+
+    switch target
+      when "install" then install()
+      when "build"   then build()
+      else throw new Error "Unknown target: '#{target}'"

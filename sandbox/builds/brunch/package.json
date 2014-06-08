@@ -1,0 +1,7 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "javascript-brunch": "^1.7.1",
+    "brunch": "^1.7.14"
+  }
+}
