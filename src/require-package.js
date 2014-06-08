@@ -438,8 +438,8 @@
     function pathLength(modulePath) { return modulePath.split('/').length; }
 
     function joinPath() {
-        var path = '', i, part;
-        for (i in arguments) { part = arguments[i]; if (part != null) { path += part + '/'; } }
+	var path = '', i = -1, part, parts = [].slice.call(arguments);
+	while (++i < parts.length) { part = parts[i]; if (part != null) { path += part + '/'; } }
         return trimSlash(path);
     }
 
