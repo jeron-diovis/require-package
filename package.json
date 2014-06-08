@@ -1,8 +1,8 @@
 {
   "name": "require-packages",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Patch \"require\" function to apply special rules of modules availability for each other",
-  "main": "src/require-package.js",
+  "main": "dist/require-package.js",
   "scripts": {
     "test": "grunt test"
   },
@@ -12,7 +12,9 @@
     "require",
     "commonjs",
     "module",
-    "package"
+    "package",
+    "component",
+    "restrict"
   ],
   "devDependencies": {
     "chai": "^1.9.1",

@@ -14,7 +14,7 @@ module.exports = (grunt) ->
         "test/test-config.coffee"
         "test/spec/**/*.{js,coffee}"
       ]
-      sandboxBuilders: "sandbox/builds"
+      sandboxBuilders: "sandbox/builders"
 
 
     uglify:
@@ -103,14 +103,12 @@ module.exports = (grunt) ->
 
   grunt.registerTask "sandbox", (target = "install", builder = "brunch") ->
     install = -> grunt.task.run "shell:installSandboxBuilders"
-    build = -> grunt.task.run "shell:buildSandbox:#{builder}"
+    build   = -> grunt.task.run "shell:buildSandbox:#{builder}"
 
     unless @args.length
       install()
       build()
-      return
-
-    switch target
+    else switch target
       when "install" then install()
       when "build"   then build()
       else throw new Error "Unknown target: '#{target}'"
