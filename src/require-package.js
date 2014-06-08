@@ -24,7 +24,7 @@
                 "public": false,
                 "packages": false,
                 "protected": false,
-                "inheritable": true
+                "inheritable": true // whether children of current package will pass theirs inheritance settings to theirs children
                 // "external" is not listed here, as it is denied for children to have own external dependencies
             }
         },
