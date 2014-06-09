@@ -460,11 +460,7 @@ module.exports =
                 parent = ensureLocation(parent);
                 child = ensureLocation(child);
                 if (direct) {
-                    if (parents[child] === parent) {
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    return parents[child] === parent;
                 } else {
                     return child.indexOf(parent) === 0;
                 }
