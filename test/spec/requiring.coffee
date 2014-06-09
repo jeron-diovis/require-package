@@ -23,15 +23,15 @@ describe "requiring packages", ->
       define "external/internal/main", -> "internal"
       define "external/internal/core/main", -> "core"
 
-      expect(require "external").is.equal "external"
-      expect(-> require "external/internal").to.throw Error, /internal.*denied/, "Main file of nested package is available from outside"
-      expect(-> require "external/internal/core").to.throw Error, /internal.*denied/, "Main file of deep nested package is available from outside"
+      expect(require "external/main").is.equal "external"
+      expect(-> require "external/internal/main").to.throw Error, /internal.*denied/, "Main file of nested package is available from outside"
+      expect(-> require "external/internal/core/main").to.throw Error, /internal.*denied/, "Main file of deep nested package is available from outside"
 
-      define "external/main", -> require "external/internal"
-      define "external/internal/main", -> require "external/internal/core"
+      define "external/main", -> require "external/internal/main"
+      define "external/internal/main", -> require "external/internal/core/main"
       define "external/internal/core/main", -> "core"
 
-      expect(require "external").is.equal "core"
+      expect(require "external/main").is.equal "core"
 
 
   describe "access to package internal files", ->

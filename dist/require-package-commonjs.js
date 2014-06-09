@@ -229,22 +229,22 @@ module.exports =
         
             function savePackage(pkg, parent) {
                 var parentLocation = trimSlash(ensureLocation(parent));
-                var hasParent = parentLocation.length > 0;
         
                 ensurePackageCanBeSaved(pkg, parentLocation);
+        
+                internal.insertPackage(pkg);
         
                 var mainFilePath = getPkgMainPath(pkg);
         
                 packages[pkg.location] = pkg;
-                internal.insertPackage(pkg);
         
                 cache[pkg.location] = pkg.location;
                 cache[mainFilePath] = pkg.location;
         
-                if (hasParent) {
-                    parents[pkg.location] = parentLocation;
-                    parents[mainFilePath] = parentLocation;
-                }
+                // package is parent for it's main file
+                parents[mainFilePath] = pkg.location;
+                parents[pkg.location] = parentLocation;
+        
                 return pkg;
             }
         
@@ -460,13 +460,20 @@ module.exports =
                 parent = ensureLocation(parent);
                 child = ensureLocation(child);
                 if (direct) {
-                    return parents[child] === parent;
+                    if (parents[child] === parent) {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 } else {
                     return child.indexOf(parent) === 0;
                 }
             }
         
-            function hasParents(pkg) { return ensureLocation(pkg) in parents; }
+            function hasParents(pkg) {
+                var location = ensureLocation(pkg);
+                return location in parents && parents[location] !== '';
+            }
         
             function isPathLeadsToMainFileOfPackage(modulePath, pkg) {
                 return modulePath === pkg.location
