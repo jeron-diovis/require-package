@@ -15,9 +15,9 @@ describe "requiring packages", ->
       require.packages.init
         location: "external"
         packages:
-          location: "internal"
+          location: /^internal$/ # mix location definitions to test whether is works also
           packages:
-            location: "core"
+            location: (path) -> path is "core"
 
       define "external/main", -> "external"
       define "external/internal/main", -> "internal"

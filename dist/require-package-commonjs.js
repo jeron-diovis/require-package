@@ -191,15 +191,22 @@ module.exports =
                     if (parent) { inherit(pkg, parent); }
                     defaults(pkg, defaultOptions.packageDefaults);
         
-                    if (typeof pkg.location === 'string') {
+                    var originLocation = pkg.location;
+                    pkg.location = joinLocations(parent, pkg);
+        
+                    if (isExactLocation(pkg.location)) {
                         savePackage(pkg, parent);
                         pkgs.splice(i, 1); // remove saved from raw set
                     } else {
+                        // raw packages should have their origin location, to match only against corresponding part of path
+                        pkg.location = originLocation;
                         pkgs[i] = pkg;
                         ++i;
                     }
+        
                     if (pkg.packages) {
                         pkg.packages = parseRawPackages(pkg.packages, pkg);
+        
                         if (pkg.packages.length === 0) {
                             pkg.packages = false;
                         }
@@ -223,8 +230,6 @@ module.exports =
             function savePackage(pkg, parent) {
                 var parentLocation = trimSlash(ensureLocation(parent));
                 var hasParent = parentLocation.length > 0;
-        
-                pkg.location = joinPath(parentLocation, pkg.location);
         
                 ensurePackageCanBeSaved(pkg, parentLocation);
         
@@ -305,7 +310,7 @@ module.exports =
                     testPath += (i > 0 ? '/' : '') + parts[i];
                     if (isMatches(testPath, rawPkg.location)) {
                         newPkg = deepClone(rawPkg);
-                        newPkg.location = testPath;
+                        newPkg.location = joinPath(parentPath, testPath);
                         savePackage(newPkg, parentPath);
                         // each time override cache, so in cache is always the most-specific path:
                         cache[modulePath] = newPkg.location;
@@ -384,10 +389,43 @@ module.exports =
         
             function ensureLocation(pkgOrLocation) {
                 if (!pkgOrLocation) { return ''; }
-                if (typeof pkgOrLocation !== 'string') {
+                if (isObject(pkgOrLocation)) {
                     return pkgOrLocation.location;
                 } else {
-                    return pkgOrLocation;
+                    return pkgOrLocation
+                }
+            }
+        
+            function isExactLocation(parent, child) {
+                return typeof ensureLocation(parent) === 'string' && typeof ensureLocation(child) === 'string';
+            }
+        
+            function rejectEmptyLocations() {
+                var result = [];
+                var args = [].slice.call(arguments);
+                for (var i = 0; i < args.length; i++) {
+                    var location = ensureLocation(args[i]);
+                    if (location !== '') {
+                        result.push(location);
+                    }
+                }
+                return result;
+            }
+        
+            function joinLocations(parent, child) {
+                parent = ensureLocation(parent);
+                child = ensureLocation(child);
+                if (isExactLocation(parent, child)) {
+                    return joinPath(parent, child);
+                } else {
+                    var nonEmptyLocations = rejectEmptyLocations(parent, child);
+                    return nonEmptyLocations.length === 1
+                        ? nonEmptyLocations[0]
+                        : function (modulePath) {
+                            // do not join patterns simply in array,
+                            // because path must match to All locations, and in proper order
+                            return isMatches(modulePath, nonEmptyLocations[0]) && isMatches(modulePath, nonEmptyLocations[1]);
+                          }
                 }
             }
         
@@ -395,6 +433,9 @@ module.exports =
             function isMatches(str, pattern) {
                 if (!pattern) {
                     return false;
+                }
+                if (isObject(pattern)) {
+                    pattern = pattern.location;
                 }
                 if (typeof pattern === 'string') {
                     return str === pattern;
@@ -410,7 +451,7 @@ module.exports =
                     }
                     return false;
                 } else {
-                    throw new Error('Pattern should be either string, regexp, or function');
+                    throw new Error('Pattern should be either string, regexp, function or array');
                 }
             }
         
@@ -432,9 +473,7 @@ module.exports =
                     || (isParent(pkg, modulePath, true) && modulePath.slice(-pkg.main.length) === pkg.main)
             }
         
-            function pathForPackageIs(type, modulePath, pkg) {
-                return isMatches(trimPkgPath(modulePath, pkg), pkg[type]);
-            }
+            function pathForPackageIs(type, modulePath, pkg) { return isMatches(trimPkgPath(modulePath, pkg), pkg[type]); }
         
             function getPkgMainPath(pkg) { return joinPath(pkg.location, pkg.main) }
         

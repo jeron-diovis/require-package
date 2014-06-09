@@ -1,1 +1,1 @@
-require.packages.init(/^packages\//);
+require.packages.init(/^packages\/\w+$/); // one-level nesting
