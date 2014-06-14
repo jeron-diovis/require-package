@@ -14,7 +14,7 @@ module.exports = (grunt) ->
         "test/test-config.coffee"
         "test/spec/**/*.{js,coffee}"
       ]
-      sandboxBuilders: "sandbox/builders"
+      sandbox: "sandbox"
 
 
     uglify:
@@ -73,8 +73,11 @@ module.exports = (grunt) ->
     shell:
       installSandboxBuilders:
         command: ->
-          builders = [].concat (["cd #{path}", "npm install", "cd -"].join("&&") for path in grunt.file.expand sysPath.join cfg("pkg.sandboxBuilders"), "*")
-          builders.join("&&")
+          [
+            "cd #{cfg('pkg.sandbox')}"
+            "npm install"
+            ("ln -sf $(pwd)/#{file} builders/brunch" for file in ["package.json", "node_modules"])...
+          ].join("&&")
 
       buildSandbox:
         command: (builder) ->
@@ -83,8 +86,9 @@ module.exports = (grunt) ->
             when "lmd"    then "build test"
             else throw new Error "Unknown sandbox builder: '#{builder}'"
 
-          cfgPath = sysPath.resolve sysPath.join cfg("pkg.sandboxBuilders"), builder
-          binPath = sysPath.join cfgPath, "node_modules/.bin/#{builder}"
+          sandboxPath = sysPath.resolve cfg("pkg.sandbox")
+          cfgPath = "#{sandboxPath}/builders/#{builder}"
+          binPath = "#{sandboxPath}/node_modules/.bin/#{builder}"
 
           [
             "cd #{cfgPath}"

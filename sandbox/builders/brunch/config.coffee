@@ -2,7 +2,13 @@ sandboxRoot = "../.."
 appRoot = "#{sandboxRoot}/app"
 
 pluginPath = "#{sandboxRoot}/../dist/require-package.js"
-vendor = [pluginPath, "#{appRoot}/packages_config.js"]
+
+entryPoint = "#{appRoot}/index.js"
+
+vendor = [
+  pluginPath
+  "#{appRoot}/packages_config.js"
+]
 
 exports.config =
   paths:
@@ -12,9 +18,13 @@ exports.config =
   modules:
     nameCleaner: (path) -> path.replace /// ^#{appRoot}\/ ///, ''
   conventions:
-    vendor: vendor
+    vendor: [
+      vendor...
+      entryPoint
+    ]
   files:
     javascripts:
       joinTo: "build.js"
       order:
         before: vendor
+        after: entryPoint

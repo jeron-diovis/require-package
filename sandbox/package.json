@@ -1,0 +1,8 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "javascript-brunch": "^1.7.1",
+    "brunch": "^1.7.14",
+    "lmd": "^1.13.3"
+  }
+}

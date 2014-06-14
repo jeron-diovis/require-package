@@ -1,3 +1,8 @@
 node_modules/
 test/test-build.js
 sandbox/public/build.js
+
+# for brunch need to create symlinks for package.json and node_modules near it's config,
+# because brunch cannot work without them
+sandbox/builders/brunch/*
+!sandbox/builders/brunch/config.coffee
