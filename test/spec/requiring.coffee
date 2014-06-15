@@ -3,7 +3,7 @@ describe "requiring packages", ->
   it "should automatically append main file to package path", ->
     require.packages.init /^pkg\/\w+$/
 
-    define "pkg/test/main", -> 42
+    define "pkg/test/index", -> 42
     define "pkg/empty", -> "package without files"
 
     expect(require "pkg/test").is.equal 42
@@ -19,19 +19,19 @@ describe "requiring packages", ->
           packages:
             location: (path) -> path is "core"
 
-      define "external/main", -> "external"
-      define "external/internal/main", -> "internal"
-      define "external/internal/core/main", -> "core"
+      define "external/index", -> "external"
+      define "external/internal/index", -> "internal"
+      define "external/internal/core/index", -> "core"
 
-      expect(require "external/main").is.equal "external"
-      expect(-> require "external/internal/main").to.throw Error, /internal.*denied/, "Main file of nested package is available from outside"
-      expect(-> require "external/internal/core/main").to.throw Error, /internal.*denied/, "Main file of deep nested package is available from outside"
+      expect(require "external/index").is.equal "external"
+      expect(-> require "external/internal/index").to.throw Error, /internal.*denied/, "Main file of nested package is available from outside"
+      expect(-> require "external/internal/core/index").to.throw Error, /internal.*denied/, "Main file of deep nested package is available from outside"
 
-      define "external/main", -> require "external/internal/main"
-      define "external/internal/main", -> require "external/internal/core/main"
-      define "external/internal/core/main", -> "core"
+      define "external/index", -> require "external/internal/index"
+      define "external/internal/index", -> require "external/internal/core/index"
+      define "external/internal/core/index", -> "core"
 
-      expect(require "external/main").is.equal "core"
+      expect(require "external/index").is.equal "core"
 
 
   describe "access to package internal files", ->
@@ -39,10 +39,10 @@ describe "requiring packages", ->
       it "should be denied by default", ->
         require.packages.init /^pkg\/\w+$/
 
-        define "pkg/test/main/internal", -> "Secret!"
-        define "pkg/friend/main", -> require "pkg/test/main/internal"
+        define "pkg/test/internal", -> "Secret!"
+        define "pkg/friend/index", -> require "pkg/test/main/internal"
 
-        expect(-> require "pkg/test/main/internal").to.throw /denied/, "Private file is available from outside"
+        expect(-> require "pkg/test/internal").to.throw /denied/, "Private file is available from outside"
         expect(-> require "pkg/friend").to.throw /denied/, "Private file is available from another package"
 
       describe "for explicitly listed files", ->
@@ -62,7 +62,7 @@ describe "requiring packages", ->
           expect(require "public_pkg/pub_internal").is.equal "Available", "Public file is not available"
 
 
-          define "public_pkg/main", -> require "public_pkg/nested_pkg/nested_pub_internal"
+          define "public_pkg/index", -> require "public_pkg/nested_pkg/nested_pub_internal"
           define "public_pkg/nested_pkg/internal", -> "Nested Secret!"
           define "public_pkg/nested_pkg/nested_pub_internal", -> "Nested Available"
 
@@ -72,8 +72,8 @@ describe "requiring packages", ->
     describe "from inside package", ->
       it "should be allowed", ->
         require.packages.init "test"
-        define "test/main", -> require "test/main/internal"
-        define "test/main/internal", -> "Secret!"
+        define "test/index", -> require "test/internal"
+        define "test/internal", -> "Secret!"
         expect(require "test").is.equal "Secret!"
 
     describe "for nested packages", ->
@@ -111,7 +111,7 @@ describe "requiring packages", ->
     it "should be denied by default", ->
       require.packages.init "test_pkg"
       define "external_module", ->
-      define "test_pkg/main", -> require "external_module"
+      define "test_pkg/index", -> require "external_module"
       expect(-> require "test_pkg").to.throw /denied/, "External file is available"
 
     it "should be allowed for explicitly listed files", ->
@@ -121,7 +121,7 @@ describe "requiring packages", ->
 
       define "utils", -> "utils"
       define "lib/support", -> "support"
-      define "packages/with_externals/main", ->
+      define "packages/with_externals/index", ->
         utils:   require "utils"
         support: require "lib/support"
 
@@ -155,7 +155,7 @@ describe "requiring packages", ->
 
         define "parent/child/utilsLoader", -> require "external/utils"
         define "parent/child/helpersLoader", -> require "parent/child/grandchild"
-        define "parent/child/grandchild/main", -> require "external/helpers"
+        define "parent/child/grandchild/index", -> require "external/helpers"
 
         define "parent/proxyUtils", -> require "parent/child/utilsLoader"
         define "parent/proxyHelpers", -> require "parent/child/helpersLoader"

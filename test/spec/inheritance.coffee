@@ -15,7 +15,7 @@ describe "inheritance", ->
     expect(require "parent/pub_proxyPublic").is.equal "child public", "'Public' option is not inherited"
 
     define "parent/pub_proxyChild", -> require "parent/child"
-    define "parent/child/main", -> "standard main file"
+    define "parent/child/index", -> "standard main file"
 
     expect(require "parent/pub_proxyChild").is.equal "standard main file", "'main' option is inherited while it should not be"
 
@@ -49,7 +49,7 @@ describe "inheritance", ->
 
     expect(require "parent/pub_proxyChildMain").is.equal "child's main file", "'main' option is not inherited"
 
-    define "parent/child/grandchild/main", -> "grandchild's standard main file"
+    define "parent/child/grandchild/index", -> "grandchild's standard main file"
     define "parent/child/pub_proxyGrandchildMain", -> require "parent/child/grandchild"
     define "parent/pub_proxyGrandchildMain", -> require "parent/child/pub_proxyGrandchildMain"
 

@@ -28,7 +28,7 @@ describe "parsing", ->
         do (type, location) ->
           it "should support #{type}", ->
             require.packages.init makeLocationDefinition location
-            define "#{makePkgName type}/main", -> makePkgContent type
+            define "#{makePkgName type}/index", -> makePkgContent type
             expect(require makePkgName type).is.equal makePkgContent(type), "#{type} definition is not supported"
 
     for suite, locationDefiner of generators
@@ -46,7 +46,7 @@ describe "parsing", ->
           for type, location of definitions
             do (type, location) ->
               packages.push makeLocationDefinition location
-              define "#{makePkgName type}/main", -> makePkgContent type
+              define "#{makePkgName type}/index", -> makePkgContent type
 
         require.packages.init packages
 
@@ -73,5 +73,5 @@ describe "parsing", ->
     expect(-> require "packages/failed_pub_package/pub_internal").to.throw /denied/, "Wow, it works"
 
     define "utils", -> "utils"
-    define "packages/failed_external_package/main", -> require "utils"
+    define "packages/failed_external_package/index", -> require "utils"
     expect(-> require "packages/failed_external_package").to.throw /denied/, "Wow, it works"

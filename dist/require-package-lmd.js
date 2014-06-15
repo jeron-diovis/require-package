@@ -18,7 +18,7 @@
         
             var defaultOptions = {
                 "packageDefaults": {
-                    "main": "main",
+                    "main": "index",
         
                     // Following options can be: string|regexp|function|array of all of these things
                     "public": false,    // package's internal files, available from outside of package
