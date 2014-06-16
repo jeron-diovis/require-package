@@ -7,7 +7,7 @@
                                 // it produces new value for "packages" hash on every new path match
             parents = {};       // map module path to *direct* parent package
     
-        var defaultOptions = {
+        var options = {
             "packageDefaults": {
                 "main": "index",
     
@@ -27,7 +27,8 @@
                     "inheritable": true // whether children of current package will pass theirs inheritance settings to theirs children
                     // "external" is not listed here, as it is denied for children to have own external dependencies
                 }
-            }
+            },
+            "allowRemoteProtected": false // whether it is allowed for children to require 'protected' files not only of *direct* parent
         };
     
         // -----------------
@@ -80,7 +81,7 @@
                     throw new Error('Packages options already configured');
                 }
                 isConfigured = true;
-                extend(defaultOptions, config);
+                extend(options, config);
             }
         };
     
@@ -142,13 +143,13 @@
             }
     
             // When requiring module from some package:
-            return (targetPkg === currentPkg)                                     // own files are allowed, of course
-                || (isParent(currentPkg, targetPkg, true)                         // when parent requires child's files:
-                    && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)     // - it can require main file
-                        || pathForPackageIs('public', modulePath, targetPkg)))    // - or explicitly exposed files
-                || (isParent(targetPkg, currentPkg, true)                         // when child requires parent's files:
-                    && (!isPathLeadsToMainFileOfPackage(modulePath, currentPkg)   // - it can NOT require main file, because it is a top-level logic
-                        && pathForPackageIs('protected', modulePath, targetPkg))) // - and can require only explicitly allowed files ('protected', in OOP sense)
+            return (targetPkg === currentPkg)                                      // own files are allowed, of course
+                || (isParent(currentPkg, targetPkg, true)                          // when parent requires child's files:
+                    && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)      // - it can require main file
+                        || pathForPackageIs('public', modulePath, targetPkg)))     // - or explicitly exposed files
+                || (isParent(targetPkg, currentPkg, !options.allowRemoteProtected) // when child requires parent's files:
+                    && (!isPathLeadsToMainFileOfPackage(modulePath, currentPkg)    // - it can NOT require main file, because it is a top-level logic
+                        && pathForPackageIs('protected', modulePath, targetPkg)))  // - and can require only explicitly allowed files ('protected', in OOP sense)
                 ;
         }
     
@@ -188,7 +189,7 @@
                 }
     
                 if (parent) { inherit(pkg, parent); }
-                defaults(pkg, defaultOptions.packageDefaults);
+                defaults(pkg, options.packageDefaults);
     
                 var originLocation = pkg.location;
                 pkg.location = joinLocations(parent, pkg);

@@ -106,6 +106,49 @@ describe "requiring packages", ->
           expect(-> require "parent/proxyPublic").to.throw Error, /Cross-package.*denied/, "Parent's public-only file is available for child"
           expect(-> require "parent/proxySelf").to.throw Error, /Cross-package.*denied/, "Parent's package itself is available for child"
 
+        describe "'protected' files of non-direct parents", ->
+          it "should not be available by default", ->
+            require.packages.init
+              location: "parent"
+              protected: /^protected_/
+              public: /.*/
+              inheritable: public: yes
+              packages:
+                location: "child"
+                packages:
+                  location: "grandchild"
+
+            define "parent/protected_parent", -> "parent protected"
+            define "parent/child/grandchild/grandparentLoader", -> require "parent/protected_parent"
+
+            # ----
+
+            define "parent/child/proxyGrandparent", -> require "parent/child/grandchild/grandparentLoader"
+            define "parent/proxyGrandparent", -> require "parent/child/proxyGrandparent"
+
+            expect(-> require "parent/proxyGrandparent").to.throw Error, /Cross-package.*denied/, "Non-direct parent's 'protected' file is available to child"
+
+          it "should be available when explicitly allowed", ->
+            require.packages.configure allowRemoteProtected: yes
+
+            require.packages.init
+              location: "parent"
+              protected: /^protected_/
+              public: /.*/
+              inheritable: public: yes
+              packages:
+                location: "child"
+                packages:
+                  location: "grandchild"
+
+            define "parent/protected_parent", -> "parent protected"
+            define "parent/child/grandchild/grandparentLoader", -> require "parent/protected_parent"
+
+            define "parent/child/proxyGrandparent", -> require "parent/child/grandchild/grandparentLoader"
+            define "parent/proxyGrandparent", -> require "parent/child/proxyGrandparent"
+
+            expect(require "parent/proxyGrandparent").is.equal "parent protected", "Remote parent's 'protected' file is not available to child"
+
 
   describe "access to external files from inside package", ->
     it "should be denied by default", ->
