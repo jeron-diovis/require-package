@@ -190,7 +190,16 @@ module.exports =
                     }
         
                     if (parent) { inherit(pkg, parent); }
+        
+                    var hasOwnExternal = !!pkg.external;
+        
                     defaults(pkg, options.packageDefaults);
+        
+                    // If is set default "external" value for all packages, we should not apply it to nested packages (as it is denied for them).
+                    // But do not process explicitly set values, because it is yet a programmer's error.
+                    if (!hasOwnExternal && !!options.packageDefaults.external && parent) {
+                        delete pkg.external;
+                    }
         
                     var originLocation = pkg.location;
                     pkg.location = joinLocations(parent, pkg);
