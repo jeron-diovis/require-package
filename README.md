@@ -56,11 +56,13 @@ But nothing more should be available from inside package - it should be maximall
 
 Of course, but only partially.
 
-* [browserify](http://browserify.org/)
-  As it uses same algorithm as in Node.js, there is no need to explain anything.
+* [Browserify](http://browserify.org/)
+  
+As it uses same algorithm as in Node.js, there is no need to explain anything.
  
 * [RequireJS](http://requirejs.org/)
-  It has a built-in [packages support](http://requirejs.org/docs/api.html#packages)
+
+It has a built-in [packages support](http://requirejs.org/docs/api.html#packages)
 
 Both of these tools provides you ability to organize packages in your code, but they don't restrict access to package files.
 
@@ -79,7 +81,7 @@ To use it, in common case you should do following:
 
 1. Load your chosen loader script, so `require` function is available.
  
-2. Load [`require-package.js`](TODO) script.
+2. Load [`require-package.js`](#https://github.com/jeron-diovis/require-package/blob/master/dist/require-package.js) script.
 
 3. Somewhere in entry point of your application do this:
 ```JavaScript
@@ -138,7 +140,7 @@ require.register("app/packages", function(exports, require, module) {
 
 #### [LMD](https://github.com/azproduction/lmd)
 
-For LMD there is a [separate plugin](TODO).
+For LMD there is a [separate plugin](#https://github.com/jeron-diovis/require-package/blob/master/dist/require-package-lmd.js).
 
 Just install it as it is described in [LMD documentation](https://github.com/azproduction/lmd/wiki/User-made-plugins).
 
@@ -174,7 +176,7 @@ Though, browserify does not need it - it is very cool itself.
 Each package is an object with following properties:
 
 
-### `location`: `String|RegExp|Function\Array` 
+##### `location`: `String|RegExp|Function|Array` 
 
 ===
 
@@ -228,7 +230,7 @@ Algorithm is following:
 Of course, all results are cached, so for each particular module search is not performed each time you `require` it.
 
 
-### `main`: `String`
+##### `main`: `String`
 
 **Default**: `"index"`
 
@@ -236,7 +238,7 @@ Of course, all results are cached, so for each particular module search is not p
 
 Name of the package main file, which will be loaded when you `require` entire package directory.
 
-### `external`: `String|RegExp|Function\Array`
+##### `external`: `String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -246,7 +248,7 @@ List of "out-of-package" modules, allowed to be `require`d from inside this pack
 
 By default, package can not require anything external.
 
-### `public`: `String|RegExp|Function\Array`
+##### `public`: `String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -256,7 +258,7 @@ List of internal package modules, allowed to be `require`d from outside of this 
  
 By default, nothing is available - only main file can be loaded.
 
-### `packages`: `String|RegExp|Function\Array`
+##### `packages`: `String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -277,7 +279,7 @@ For the outer world, topmost package is a single unit (no one knows what it has 
 * They can't `require` a `main` file of any parent package, no matter whether it matches to list of available modules (see the next option).
 Because parent package represents a logic of top level, where child package is just a one small part.
   
-### `protected`: `String|RegExp|Function\Array`
+##### `protected`: `String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -312,7 +314,7 @@ require.packages.init([
 
 ===
 
-### `inheritable`: `Object`
+##### `inheritable`: `Object`
 
 **Default**: `JavaScript
   {
@@ -352,7 +354,7 @@ Just like `init` method, `configure` could be called only once, so no one module
 
 Following options are available:
 
-### `packageDefaults`: `Object`
+##### `packageDefaults`: `Object`
 
 ===
 
@@ -371,7 +373,7 @@ require.packages.configure({
 });
 `
 
-### `allowRemoteProtected`: `Boolean`
+##### `allowRemoteProtected`: `Boolean`
 
 **Default**: `false`
 
