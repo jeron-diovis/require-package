@@ -2,8 +2,6 @@
 
 Restrict access to modules for "require"
 
----
-
 ## The Need
 
 There are different types of application architecture.
@@ -35,8 +33,6 @@ So here is a little tool to make modules usage some more controllable.
 **Disclaimer**: it is a "foolproof"-tool. You definitely don't need it if all your team understands what do they do. 
 Otherwise, if you want to apply some safeguards to your code usage - welcome. 
 
----
-
 ## So how should it be?
 
 1. Group business-logic in independent packages.
@@ -50,17 +46,17 @@ But nothing more should be available from inside package - it should be maximall
 
 4. Of course, packages can be nested. In this case, need a way to control whether children can use parent's modules. 
 
----
-
 ## Well, is it already implemented somewhere?
 
 Of course, but only partially.
 
-* [browserify](http://browserify.org/)
-  As it uses same algorithm as in Node.js, there is no need to explain anything.
+* [Browserify](http://browserify.org/)
+  
+As it uses same algorithm as in Node.js, there is no need to explain anything.
  
 * [RequireJS](http://requirejs.org/)
-  It has a built-in [packages support](http://requirejs.org/docs/api.html#packages)
+
+It has a built-in [packages support](http://requirejs.org/docs/api.html#packages)
 
 Both of these tools provides you ability to organize packages in your code, but they don't restrict access to package files.
 
@@ -79,7 +75,7 @@ To use it, in common case you should do following:
 
 1. Load your chosen loader script, so `require` function is available.
  
-2. Load [`require-package.js`](TODO) script.
+2. Load [`require-package.js`](https://github.com/jeron-diovis/require-package/blob/master/dist/require-package.js) script.
 
 3. Somewhere in entry point of your application do this:
 ```JavaScript
@@ -138,7 +134,7 @@ require.register("app/packages", function(exports, require, module) {
 
 #### [LMD](https://github.com/azproduction/lmd)
 
-For LMD there is a [separate plugin](TODO).
+For LMD there is a [separate plugin](https://github.com/jeron-diovis/require-package/blob/master/dist/require-package-lmd.js).
 
 Just install it as it is described in [LMD documentation](https://github.com/azproduction/lmd/wiki/User-made-plugins).
 
@@ -163,20 +159,15 @@ So it is not recommended, and I didn't test whether they can really work togethe
 
 Here all is simple: it is impossible to use `require-package` with browserify :)
 
-There are absolutely no ways to interrupt in it's internal loading mechanism.
-
-Though, browserify does not need it - it is very cool itself.
-
----
+There are absolutely no ways to interrupt in it's internal loading mechanism. Though, browserify does not need it at all - it would be ambiguous to modify Node.js algorithm.
 
 ## Package options
 
 Each package is an object with following properties:
 
+#### `location` 
 
-### `location`: `String|RegExp|Function\Array` 
-
-===
+`String|RegExp|Function|Array` 
 
 Where the package is.
 
@@ -210,7 +201,7 @@ Algorithm is following:
   
  4. Multipath packages are checked in order they listed in config. 
  Be warn with this: for example, if you have two definitions -
-  `JavaScript
+  ```JavaScript
     require.packages.init([
       /^packages\//,
       {
@@ -218,8 +209,8 @@ Algorithm is following:
         ... some custom properties here ...
       }
     ]);
-  `
-   , and you require module "packages/firstPackage" - it will be recognized as `/^packages\//`, which has no custom properties, so it's behavior will be not as you want.
+  ```
+and you require module "packages/firstPackage" - it will be recognized as `/^packages\//`, which has no custom properties, so it's behavior will be not as you want.
  
  5. If one of multipath packages matches to module path, this path is recorded as new "exact" package. 
  
@@ -227,40 +218,47 @@ Algorithm is following:
  
 Of course, all results are cached, so for each particular module search is not performed each time you `require` it.
 
+===
 
-### `main`: `String`
+#### `main`
+
+`String`
 
 **Default**: `"index"`
 
-===
-
 Name of the package main file, which will be loaded when you `require` entire package directory.
 
-### `external`: `String|RegExp|Function\Array`
+===
+
+#### `external` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
-
-===
 
 List of "out-of-package" modules, allowed to be `require`d from inside this package. 
 
 By default, package can not require anything external.
 
-### `public`: `String|RegExp|Function\Array`
+===
+
+#### `public` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
-
-===
 
 List of internal package modules, allowed to be `require`d from outside of this package (that is, both from "out-of-package" modules and from inside other packages).
  
 By default, nothing is available - only main file can be loaded.
 
-### `packages`: `String|RegExp|Function\Array`
+===
+
+#### `packages` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
-
-===
 
 Packages, nested to current one. 
 
@@ -276,12 +274,14 @@ For the outer world, topmost package is a single unit (no one knows what it has 
 
 * They can't `require` a `main` file of any parent package, no matter whether it matches to list of available modules (see the next option).
 Because parent package represents a logic of top level, where child package is just a one small part.
-  
-### `protected`: `String|RegExp|Function\Array`
+
+===  
+
+#### `protected` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
-
-===
 
 List of modules, available for packages nested to current one.
 
@@ -289,14 +289,15 @@ By default, nothing is available. It differs from Node.js, but it is done for th
 
 It is assumed that not so much parent's modules will be required for children - it should be some basic classes, mostly models/collections, describing data structures, specific for package. 
 
-Also, by default, children can require only *direct* parent's modules. It also can be [changed](#TODO).
+Also, by default, children can require only *direct* parent's modules. It also can be [changed](#allowremoteprotected).
 
-===
+---
 
 **Important note**: for all currently listed options paths are *relative to package location*. 
 
 That is, if you have packages `parent` and `parent/child`, and want to make module `parent/child/myModule` public, you should do it like this:
-`JavaScript
+
+```JavaScript
 require.packages.init([
   {
     location: "parent",
@@ -308,13 +309,16 @@ require.packages.init([
     ]
   }
 ]);
-`
+```
 
-===
+---
 
-### `inheritable`: `Object`
+#### `inheritable`
 
-**Default**: `JavaScript
+`Object`
+
+**Default**: 
+```JavaScript
   {
     "main": false,
     "public": false,
@@ -322,9 +326,7 @@ require.packages.init([
     "protected": false,
     "inheritable": true
   }
-`
-
-===
+```
 
 What properties of parent's package it's nested packages will inherit.
 
@@ -342,8 +344,6 @@ Values are just boolean, indicating whether inheritance is allowed.
 Also, note, that `inheritable` hash contains "inheritable" property itself, with default to true. 
 This means, that each new child allows for his to children to inherit his properties. You can set it to false and so break the inheritance chain - the next children will use only global defaults.
 
----
-
 ## Global options
 
 You can also change some global plugin options, using `require.packages.configure()` method.
@@ -352,14 +352,17 @@ Just like `init` method, `configure` could be called only once, so no one module
 
 Following options are available:
 
-### `packageDefaults`: `Object`
-
 ===
+
+#### `packageDefaults`
+
+`Object`
 
 Here you can override default value for any option from [package options](#package-options) section. 
 
 It uses deep extending, so you can selectively override some options from `inheritable` hash.
-`JavaScript
+
+```JavaScript
 require.packages.configure({
   "packageDefaults": {
     "main": "main", // use main file like in RequireJS packages
@@ -369,12 +372,14 @@ require.packages.configure({
     }
   }
 });
-`
-
-### `allowRemoteProtected`: `Boolean`
-
-**Default**: `false`
+```
 
 ===
+
+#### `allowRemoteProtected`
+
+`Boolean`
+
+**Default**: `false`
 
 Whether it is allowed for nested packages to `require` `protected` modules not only from *direct* parent package, but from any parent up to the top of three.
