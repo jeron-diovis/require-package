@@ -62,8 +62,6 @@ Both of these tools provides you ability to organize packages in your code, but 
 
 That's why additional tool required.
 
----
-
 ## Installation and Usage
 
 ### Common installation case
