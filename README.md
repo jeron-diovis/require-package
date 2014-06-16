@@ -165,8 +165,6 @@ There are absolutely no ways to interrupt in it's internal loading mechanism. Th
 
 Each package is an object with following properties:
 
-===
-
 #### `location` 
 
 `String|RegExp|Function|Array` 
@@ -222,7 +220,7 @@ Of course, all results are cached, so for each particular module search is not p
 
 ===
 
-#### `main`:
+#### `main`
 
 `String`
 
@@ -291,7 +289,7 @@ By default, nothing is available. It differs from Node.js, but it is done for th
 
 It is assumed that not so much parent's modules will be required for children - it should be some basic classes, mostly models/collections, describing data structures, specific for package. 
 
-Also, by default, children can require only *direct* parent's modules. It also can be [changed](#allowRemoteProtected).
+Also, by default, children can require only *direct* parent's modules. It also can be [changed](#allowremoteprotected).
 
 ---
 
