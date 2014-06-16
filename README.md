@@ -165,7 +165,11 @@ There are absolutely no ways to interrupt in it's internal loading mechanism. Th
 
 Each package is an object with following properties:
 
-##### `location`: `String|RegExp|Function|Array` 
+===
+
+#### `location` 
+
+`String|RegExp|Function|Array` 
 
 Where the package is.
 
@@ -199,7 +203,7 @@ Algorithm is following:
   
  4. Multipath packages are checked in order they listed in config. 
  Be warn with this: for example, if you have two definitions -
-  `JavaScript
+  ```JavaScript
     require.packages.init([
       /^packages\//,
       {
@@ -207,8 +211,8 @@ Algorithm is following:
         ... some custom properties here ...
       }
     ]);
-  `
-   , and you require module "packages/firstPackage" - it will be recognized as `/^packages\//`, which has no custom properties, so it's behavior will be not as you want.
+  ```
+and you require module "packages/firstPackage" - it will be recognized as `/^packages\//`, which has no custom properties, so it's behavior will be not as you want.
  
  5. If one of multipath packages matches to module path, this path is recorded as new "exact" package. 
  
@@ -217,14 +221,20 @@ Algorithm is following:
 Of course, all results are cached, so for each particular module search is not performed each time you `require` it.
 
 ===
-##### `main`: `String`
+
+#### `main`:
+
+`String`
 
 **Default**: `"index"`
 
 Name of the package main file, which will be loaded when you `require` entire package directory.
 
 ===
-##### `external`: `String|RegExp|Function|Array`
+
+#### `external` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -233,7 +243,10 @@ List of "out-of-package" modules, allowed to be `require`d from inside this pack
 By default, package can not require anything external.
 
 ===
-##### `public`: `String|RegExp|Function|Array`
+
+#### `public` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -242,7 +255,10 @@ List of internal package modules, allowed to be `require`d from outside of this 
 By default, nothing is available - only main file can be loaded.
 
 ===
-##### `packages`: `String|RegExp|Function|Array`
+
+#### `packages` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -262,7 +278,10 @@ For the outer world, topmost package is a single unit (no one knows what it has 
 Because parent package represents a logic of top level, where child package is just a one small part.
 
 ===  
-##### `protected`: `String|RegExp|Function|Array`
+
+#### `protected` 
+
+`String|RegExp|Function|Array`
 
 **Default**: `false`
 
@@ -272,14 +291,15 @@ By default, nothing is available. It differs from Node.js, but it is done for th
 
 It is assumed that not so much parent's modules will be required for children - it should be some basic classes, mostly models/collections, describing data structures, specific for package. 
 
-Also, by default, children can require only *direct* parent's modules. It also can be [changed](#TODO).
+Also, by default, children can require only *direct* parent's modules. It also can be [changed](#allowRemoteProtected).
 
-===
+---
 
 **Important note**: for all currently listed options paths are *relative to package location*. 
 
 That is, if you have packages `parent` and `parent/child`, and want to make module `parent/child/myModule` public, you should do it like this:
-`JavaScript
+
+```JavaScript
 require.packages.init([
   {
     location: "parent",
@@ -291,10 +311,13 @@ require.packages.init([
     ]
   }
 ]);
-`
+```
 
-===
-##### `inheritable`: `Object`
+---
+
+#### `inheritable`
+
+`Object`
 
 **Default**: 
 ```JavaScript
@@ -331,7 +354,11 @@ Just like `init` method, `configure` could be called only once, so no one module
 
 Following options are available:
 
-##### `packageDefaults`: `Object`
+===
+
+#### `packageDefaults`
+
+`Object`
 
 Here you can override default value for any option from [package options](#package-options) section. 
 
@@ -350,7 +377,10 @@ require.packages.configure({
 ```
 
 ===
-##### `allowRemoteProtected`: `Boolean`
+
+#### `allowRemoteProtected`
+
+`Boolean`
 
 **Default**: `false`
 
