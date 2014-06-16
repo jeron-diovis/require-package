@@ -1,10 +1,14 @@
 {
   "name": "require-packages",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "description": "Patch \"require\" function to apply special rules of modules availability for each other",
   "main": "dist/require-package.js",
   "scripts": {
     "test": "grunt test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeron-diovis/require-package.git"
   },
   "author": "Jeron Diovis",
   "license": "MIT",
