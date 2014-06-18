@@ -78,6 +78,8 @@
                         throw new Error('Packages list already initialized');
                     }
                     isInitialized = true;
+                    // after packages are initialized, no configuring should be done
+                    isConfigured = true;
         
                     // Maybe, it is worth to deeply clone incoming data, to encapsulate them safely.
                     // But it will be verbose enough (as need to clone functions and regexps)
@@ -87,7 +89,7 @@
         
                 configure: function (config) {
                     if (isConfigured) {
-                        throw new Error('Packages options already configured');
+                        throw new Error('Packages options already configured, or packages structure is already initialized');
                     }
                     isConfigured = true;
                     extend(options, config);

@@ -8,3 +8,7 @@ describe "initialization", ->
     require.packages.configure packageDefaults: main: "TheMain"
 
     expect(-> require.packages.configure packageDefaults: main: "EntryPoint").to.throw Error, /already configured/, "Packages options can be configured multiple times"
+
+  it "should not allow to configure plugin after plugin was initialized", ->
+    require.packages.init "test"
+    expect(-> require.packages.configure()).to.throw Error, /already configured/, "Packages options can be configured after packages are initialized"

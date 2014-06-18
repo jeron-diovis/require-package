@@ -349,6 +349,7 @@ This means, that each new child allows for his to children to inherit his proper
 You can also change some global plugin options, using `require.packages.configure()` method.
 
 Just like `init` method, `configure` could be called only once, so no one module will suddenly override your settings. 
+Also `configure` can not be called after `init` was, just for the same reason. So care about configuration before you actually initialize your packages structure. 
 
 Following options are available:
 
