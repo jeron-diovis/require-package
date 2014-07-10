@@ -147,9 +147,10 @@ module.exports =
         
                 // When requiring module from some package:
                 return (targetPkg === currentPkg)                                      // own files are allowed, of course
-                    || (isParent(currentPkg, targetPkg, true)                          // when parent requires child's files:
-                        && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)      // - it can require main file
-                            || pathForPackageIs('public', modulePath, targetPkg)))     // - or explicitly exposed files
+                    || ((isParent(currentPkg, targetPkg, true)                         // when parent requires child's files
+                        || isSiblings(currentPkg, targetPkg))                          // or current pkg has same parent as target pkg:
+                            && (isPathLeadsToMainFileOfPackage(modulePath, targetPkg)  // - it can require main file
+                                || pathForPackageIs('public', modulePath, targetPkg))) // - or explicitly exposed files
                     || (isParent(targetPkg, currentPkg, !options.allowRemoteProtected) // when child requires parent's files:
                         && (!isPathLeadsToMainFileOfPackage(modulePath, currentPkg)    // - it can NOT require main file, because it is a top-level logic
                             && pathForPackageIs('protected', modulePath, targetPkg)))  // - and can require only explicitly allowed files ('protected', in OOP sense)
@@ -476,6 +477,10 @@ module.exports =
                 } else {
                     return child.indexOf(parent) === 0;
                 }
+            }
+        
+            function isSiblings(pkg1, pkg2) {
+                return internal.findClosestParent(pkg1.location) === internal.findClosestParent(pkg2.location);
             }
         
             function hasParents(pkg) {

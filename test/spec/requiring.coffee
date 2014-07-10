@@ -51,7 +51,7 @@ describe "requiring packages", ->
             location: "public_pkg"
             public: /^pub_/
             packages:
-              location: "nested_pkg"
+              location: ["nested_pkg", "nested_neighbour"]
               public: /^nested_pub_/
 
 
@@ -61,6 +61,7 @@ describe "requiring packages", ->
           expect(-> require "public_pkg/internal").to.throw Error, /internal.*outside.*denied/, "Private file is available"
           expect(require "public_pkg/pub_internal").is.equal "Available", "Public file is not available"
 
+          # ---------------
 
           define "public_pkg/index", -> require "public_pkg/nested_pkg/nested_pub_internal"
           define "public_pkg/nested_pkg/internal", -> "Nested Secret!"
@@ -68,6 +69,15 @@ describe "requiring packages", ->
 
           expect(-> require "public_pkg/nested_pkg/nested_pub_internal").to.throw Error, /internal.*outside.*denied/, "Child's private files are available from external module"
           expect(require "public_pkg").is.equal "Nested Available", "Child's public files are not available to parent"
+
+          # ---------------
+
+          define "public_pkg/index", -> require "public_pkg/nested_pkg"
+          define "public_pkg/nested_pkg/index", -> require "public_pkg/nested_neighbour"
+          define "public_pkg/nested_neighbour/index", -> "neighbour's value"
+          expect(require "public_pkg").is.equal "neighbour's value", "Sibling packages can't access each other"
+
+
 
     describe "from inside package", ->
       it "should be allowed", ->
