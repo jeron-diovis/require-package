@@ -234,7 +234,7 @@ Name of the package main file, which will be loaded when you `require` entire pa
 
 **Default**: `false`
 
-List of "out-of-package" modules, allowed to be `require`d from inside this package. 
+List of "out-of-package" modules, allowed to be `require`'d from inside this package. 
 
 By default, package can not require anything external.
 
@@ -246,7 +246,7 @@ By default, package can not require anything external.
 
 **Default**: `false`
 
-List of internal package modules, allowed to be `require`d from outside of this package (that is, both from "out-of-package" modules and from inside other packages).
+List of internal package modules, allowed to be `require`'d from outside of this package (that is, both from "out-of-package" modules and from inside other packages).
  
 By default, nothing is available - only main file can be loaded.
 
@@ -270,7 +270,7 @@ It is similar to Node.js algorithm - search is not performed downside by file tr
 * They can't have `external` property. Only the topmost package in tree can specify external dependencies. 
 For the outer world, topmost package is a single unit (no one knows what it has inside), so only it's own configuration should determine what it depends from.
 
-* They can't `require` a `main` file of any parent package, no matter whether it matches to list of available modules (see the next option).
+* They can't `require` a `main` file of any parent package, no matter whether it matches to [list of available modules](#protected).
 Because parent package represents a logic of top level, where child package is just a one small part.
 
 ===  
@@ -301,8 +301,8 @@ require.packages.init([
     location: "parent",
     packages: [
       {
-        location: "child"
-        public: "myModule" // <== relative to "child". Do not specify full path `parent/child/myModule`.
+        location: "child"  // <== relative to "parent"
+        public: "myModule" // <== relative to "child"
       }
     ]
   }
@@ -332,8 +332,11 @@ You may want to create a packages tree where all packages follows same rules - f
 In this case, it will be annoying to define such rules on each new nesting level. Instead, you may set rules for topmost package in tree, and allow for children to inherit them.
 
 The rules are simple:
+
 1. If package has own value for property, it will be used.
+
 2. Otherwise, if property is allowed to inherit, it will be taken from *direct* parent package.
+
 3. Otherwise global default value will be used. 
 
 As you can see, `inheritable` hash contains all of the options above, except of `external` - because, as you remember, it is denied for children to have own external dependencies.
@@ -350,9 +353,7 @@ Just like `init` method, `configure` could be called only once, so no one module
 Also `configure` can not be called after `init` was, just for the same reason. So care about configuration before you actually initialize your packages structure. 
 
 Following options are available:
-
 ===
-
 #### `packageDefaults`
 
 `Object`
@@ -381,4 +382,4 @@ require.packages.configure({
 
 **Default**: `false`
 
-Whether it is allowed for nested packages to `require` `protected` modules not only from *direct* parent package, but from any parent up to the top of three.
+Whether it is allowed for nested packages to `require` `protected` modules not only from *direct* parent package, but from any parent up to the top of tree.
